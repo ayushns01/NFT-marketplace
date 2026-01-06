@@ -1,0 +1,29 @@
+{
+  "name": "nft-marketplace",
+  "version": "1.0.0",
+  "description": "> A production-grade, gas-optimized NFT marketplace supporting ERC-721 & ERC-1155 with advanced auction mechanisms, royalty enforcement, and cross-chain compatibility.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ayushns01/NFT-marketplace.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ayushns01/NFT-marketplace/issues"
+  },
+  "homepage": "https://github.com/ayushns01/NFT-marketplace#readme",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "ethers": "^6.4.0",
+    "hardhat": "^2.22.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.4.0"
+  }
+}
