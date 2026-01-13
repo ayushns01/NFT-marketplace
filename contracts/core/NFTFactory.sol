@@ -50,8 +50,8 @@ contract NFTFactory is Ownable {
     }
 
     function createERC721Collection(
-        string memory name,
-        string memory symbol,
+        string calldata name,
+        string calldata symbol,
         uint256 maxSupply,
         address royaltyReceiver,
         uint96 royaltyFee
@@ -83,9 +83,9 @@ contract NFTFactory is Ownable {
     }
 
     function createERC1155Collection(
-        string memory name,
-        string memory symbol,
-        string memory baseURI,
+        string calldata name,
+        string calldata symbol,
+        string calldata baseURI,
         address royaltyReceiver,
         uint96 royaltyFee
     ) external payable returns (address) {
@@ -117,8 +117,8 @@ contract NFTFactory is Ownable {
 
     function predictERC721Address(
         address creator,
-        string memory name,
-        string memory symbol,
+        string calldata name,
+        string calldata symbol,
         uint256 timestamp
     ) external view returns (address) {
         bytes32 salt = keccak256(
@@ -129,8 +129,8 @@ contract NFTFactory is Ownable {
 
     function predictERC1155Address(
         address creator,
-        string memory name,
-        string memory symbol,
+        string calldata name,
+        string calldata symbol,
         uint256 timestamp
     ) external view returns (address) {
         bytes32 salt = keccak256(

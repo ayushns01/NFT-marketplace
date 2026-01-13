@@ -67,7 +67,7 @@ describe("Marketplace", function () {
     describe("ERC721 Listing", function () {
         it("Should list an ERC721 token", async function () {
             const price = ethers.parseEther("1");
-            
+
             await marketplace.connect(seller).listERC721(
                 await erc721.getAddress(),
                 0,
@@ -114,7 +114,7 @@ describe("Marketplace", function () {
     describe("ERC1155 Listing", function () {
         it("Should list ERC1155 tokens", async function () {
             const price = ethers.parseEther("0.5");
-            
+
             await marketplace.connect(seller).listERC1155(
                 await erc1155.getAddress(),
                 0,
@@ -154,7 +154,7 @@ describe("Marketplace", function () {
             await marketplace.connect(buyer).buy(0, { value: ethers.parseEther("1") });
 
             expect(await erc721.ownerOf(0)).to.equal(buyer.address);
-            
+
             const listing = await marketplace.getListing(0);
             expect(listing.status).to.equal(1); // Sold
         });
@@ -300,7 +300,7 @@ describe("Marketplace", function () {
         it("Should not allow fee above 10%", async function () {
             await expect(
                 marketplace.setPlatformFee(1001)
-            ).to.be.revertedWith("Fee too high");
+            ).to.be.revertedWithCustomError(marketplace, "FeeTooHigh");
         });
 
         it("Should allow owner to set fee recipient", async function () {
@@ -310,7 +310,7 @@ describe("Marketplace", function () {
 
         it("Should allow owner to pause", async function () {
             await marketplace.pause();
-            
+
             await expect(
                 marketplace.connect(seller).listERC721(
                     await erc721.getAddress(),

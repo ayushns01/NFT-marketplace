@@ -84,7 +84,7 @@ describe("AuctionEngine", function () {
                 auctionEngine.connect(seller).createEnglishAuction(
                     await erc721.getAddress(), 0, ethers.parseEther("1"), 0, 60
                 )
-            ).to.be.revertedWith("Duration too short");
+            ).to.be.revertedWithCustomError(auctionEngine, "InvalidDuration");
         });
     });
 
@@ -108,7 +108,7 @@ describe("AuctionEngine", function () {
                 auctionEngine.connect(seller).createDutchAuction(
                     await erc721.getAddress(), 0, ethers.parseEther("1"), ethers.parseEther("1"), ONE_DAY
                 )
-            ).to.be.revertedWith("Invalid prices");
+            ).to.be.revertedWithCustomError(auctionEngine, "InvalidPrice");
         });
     });
 
@@ -138,7 +138,7 @@ describe("AuctionEngine", function () {
         it("Should reject bid below minimum", async function () {
             await expect(
                 auctionEngine.connect(bidder1).placeBid(0, { value: ethers.parseEther("0.5") })
-            ).to.be.revertedWith("Bid too low");
+            ).to.be.revertedWithCustomError(auctionEngine, "BidTooLow");
         });
 
         it("Should add previous bid to pending returns", async function () {
@@ -264,7 +264,7 @@ describe("AuctionEngine", function () {
         });
 
         it("Should fail to end before time", async function () {
-            await expect(auctionEngine.endAuction(0)).to.be.revertedWith("Still active");
+            await expect(auctionEngine.endAuction(0)).to.be.revertedWithCustomError(auctionEngine, "AuctionStillActive");
         });
     });
 
@@ -288,13 +288,13 @@ describe("AuctionEngine", function () {
 
             await expect(
                 auctionEngine.connect(seller).cancelAuction(0)
-            ).to.be.revertedWith("Has bids");
+            ).to.be.revertedWithCustomError(auctionEngine, "HasBids");
         });
 
         it("Should not allow non-seller to cancel", async function () {
             await expect(
                 auctionEngine.connect(bidder1).cancelAuction(0)
-            ).to.be.revertedWith("Not seller");
+            ).to.be.revertedWithCustomError(auctionEngine, "NotSeller");
         });
     });
 

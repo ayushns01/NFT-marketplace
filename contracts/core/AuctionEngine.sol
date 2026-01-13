@@ -86,6 +86,8 @@ contract AuctionEngine is
     error TransferFailed();
     error ZeroAddress();
     error HasBids();
+    error InvalidParams();
+    error FeeTooHigh();
 
     constructor(
         uint256 _platformFee,
@@ -104,8 +106,8 @@ contract AuctionEngine is
         uint256 reservePrice,
         uint256 duration
     ) external whenNotPaused nonReentrant returns (uint256) {
-        require(duration >= 1 hours, "Duration too short");
-        require(startPrice > 0, "Invalid price");
+        if (duration < 1 hours) revert InvalidDuration();
+        if (startPrice == 0) revert InvalidPrice();
 
         IERC721(nftContract).safeTransferFrom(
             msg.sender,
@@ -143,8 +145,8 @@ contract AuctionEngine is
         uint256 endPrice,
         uint256 duration
     ) external whenNotPaused nonReentrant returns (uint256) {
-        require(duration >= 1 hours, "Duration too short");
-        require(startPrice > endPrice, "Invalid prices");
+        if (duration < 1 hours) revert InvalidDuration();
+        if (startPrice <= endPrice) revert InvalidPrice();
 
         IERC721(nftContract).safeTransferFrom(
             msg.sender,
@@ -183,8 +185,8 @@ contract AuctionEngine is
         uint256 reservePrice,
         uint256 duration
     ) external whenNotPaused nonReentrant returns (uint256) {
-        require(duration >= 1 hours, "Duration too short");
-        require(startPrice > 0 && amount > 0, "Invalid params");
+        if (duration < 1 hours) revert InvalidDuration();
+        if (startPrice == 0 || amount == 0) revert InvalidParams();
 
         IERC1155(nftContract).safeTransferFrom(
             msg.sender,
@@ -222,8 +224,8 @@ contract AuctionEngine is
     ) external payable whenNotPaused nonReentrant {
         Auction storage auction = auctions[auctionId];
 
-        require(auction.status == AuctionStatus.Active, "Not active");
-        require(block.timestamp < auction.endTime, "Expired");
+        if (auction.status != AuctionStatus.Active) revert AuctionNotActive();
+        if (block.timestamp >= auction.endTime) revert AuctionExpired();
 
         if (auction.auctionType == AuctionType.Dutch) {
             _handleDutchBid(auctionId, auction);
@@ -245,7 +247,7 @@ contract AuctionEngine is
                 ((auction.highestBid * minBidIncrementBps) / 10000);
         }
 
-        require(msg.value >= minBid, "Bid too low");
+        if (msg.value < minBid) revert BidTooLow();
 
         if (auction.highestBidder != address(0)) {
             pendingReturns[auction.highestBidder] += auction.highestBid;
@@ -268,7 +270,7 @@ contract AuctionEngine is
         Auction storage auction
     ) internal {
         uint256 currentPrice = getDutchPrice(auctionId);
-        require(msg.value >= currentPrice, "Insufficient payment");
+        if (msg.value < currentPrice) revert BidTooLow();
 
         auction.status = AuctionStatus.Ended;
         auction.highestBidder = msg.sender;
@@ -303,8 +305,8 @@ contract AuctionEngine is
     function endAuction(uint256 auctionId) external nonReentrant {
         Auction storage auction = auctions[auctionId];
 
-        require(auction.status == AuctionStatus.Active, "Not active");
-        require(block.timestamp >= auction.endTime, "Still active");
+        if (auction.status != AuctionStatus.Active) revert AuctionNotActive();
+        if (block.timestamp < auction.endTime) revert AuctionStillActive();
 
         auction.status = AuctionStatus.Ended;
 
@@ -331,9 +333,9 @@ contract AuctionEngine is
     function cancelAuction(uint256 auctionId) external nonReentrant {
         Auction storage auction = auctions[auctionId];
 
-        require(auction.seller == msg.sender, "Not seller");
-        require(auction.status == AuctionStatus.Active, "Not active");
-        require(auction.highestBidder == address(0), "Has bids");
+        if (auction.seller != msg.sender) revert NotSeller();
+        if (auction.status != AuctionStatus.Active) revert AuctionNotActive();
+        if (auction.highestBidder != address(0)) revert HasBids();
 
         auction.status = AuctionStatus.Cancelled;
         _transferNFT(auction, auction.seller);
@@ -343,7 +345,7 @@ contract AuctionEngine is
 
     function withdrawPendingReturns() external nonReentrant {
         uint256 amount = pendingReturns[msg.sender];
-        require(amount > 0, "Nothing to withdraw");
+        if (amount == 0) revert NoPendingReturns();
 
         pendingReturns[msg.sender] = 0;
         (bool success, ) = payable(msg.sender).call{value: amount}("");
@@ -418,12 +420,12 @@ contract AuctionEngine is
     }
 
     function setPlatformFee(uint256 newFee) external onlyOwner {
-        require(newFee <= 1000, "Fee too high");
+        if (newFee > 1000) revert FeeTooHigh();
         platformFee = newFee;
     }
 
     function setFeeRecipient(address newRecipient) external onlyOwner {
-        require(newRecipient != address(0), "Zero address");
+        if (newRecipient == address(0)) revert ZeroAddress();
         feeRecipient = newRecipient;
     }
 

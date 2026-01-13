@@ -101,6 +101,7 @@ contract Marketplace is
     error TransferFailed();
     error NotTokenOwner();
     error ZeroAddress();
+    error FeeTooHigh();
 
     constructor(
         uint256 _platformFee,
@@ -388,7 +389,7 @@ contract Marketplace is
     }
 
     function setPlatformFee(uint256 newFee) external onlyOwner {
-        require(newFee <= 1000, "Fee too high");
+        if (newFee > 1000) revert FeeTooHigh();
         platformFee = newFee;
         emit PlatformFeeUpdated(newFee);
     }
