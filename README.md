@@ -1,6 +1,6 @@
 # 🎨 NFT Marketplace
 
-> Production-grade NFT marketplace with UUPS upgradeability, role-based access control, and advanced auction mechanisms.
+> NFT marketplace with UUPS upgradeability, role-based access control, and advanced auction mechanisms.
 
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.20%20|%200.8.22-blue)](https://soliditylang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
