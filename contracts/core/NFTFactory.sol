@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
@@ -40,11 +40,14 @@ contract NFTFactory is Ownable {
     error InsufficientFee();
     error InvalidImplementation();
     error TransferFailed();
+    error ZeroAddress();
 
     constructor(
         address _erc721Implementation,
         address _erc1155Implementation
     ) Ownable(msg.sender) {
+        if (_erc721Implementation == address(0)) revert ZeroAddress();
+        if (_erc1155Implementation == address(0)) revert ZeroAddress();
         erc721Implementation = _erc721Implementation;
         erc1155Implementation = _erc1155Implementation;
     }

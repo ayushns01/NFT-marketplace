@@ -1,0 +1,505 @@
+'npx hardhat clean' running (wd: /Users/ayushns01/Desktop/Repositories/NFT-marketplace)
+'npx hardhat clean --global' running (wd: /Users/ayushns01/Desktop/Repositories/NFT-marketplace)
+Problem executing hardhat: WARNING: You are currently using Node.js v25.1.0, which is not supported by Hardhat. This can lead to unexpected behavior. See https://v2.hardhat.org/nodejs-versions
+
+'npx hardhat compile --force' running (wd: /Users/ayushns01/Desktop/Repositories/NFT-marketplace)
+INFO:Detectors:
+LazyMinting._distributePayment(LazyMinting.NFTVoucher) (contracts/advanced/LazyMinting.sol#111-128) sends eth to arbitrary user
+	Dangerous calls:
+	- (feeSuccess,None) = address(feeRecipient).call{value: platformAmount}() (contracts/advanced/LazyMinting.sol#117)
+	- (royaltySuccess,None) = address(voucher.creator).call{value: royaltyAmount}() (contracts/advanced/LazyMinting.sol#122)
+	- (creatorSuccess,None) = address(voucher.creator).call{value: creatorAmount}() (contracts/advanced/LazyMinting.sol#126)
+AuctionEngine._distributePayment(AuctionEngine.Auction,uint256) (contracts/core/AuctionEngine.sol#373-405) sends eth to arbitrary user
+	Dangerous calls:
+	- (feeSuccess,None) = address(feeRecipient).call{value: platformAmount}() (contracts/core/AuctionEngine.sol#390-392)
+Marketplace._executeSale(Marketplace.Listing,address,uint256) (contracts/core/Marketplace.sol#316-367) sends eth to arbitrary user
+	Dangerous calls:
+	- (feeSuccess,None) = address(feeRecipient).call{value: platformAmount}() (contracts/core/Marketplace.sol#350-352)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#functions-that-send-ether-to-arbitrary-destinations
+INFO:Detectors:
+NFTFactory.createERC721Collection(string,string,uint256,address,uint96) (contracts/core/NFTFactory.sol#52-83) calls abi.encodePacked() with multiple dynamic arguments:
+	- salt = keccak256(bytes)(abi.encodePacked(msg.sender,name,symbol,block.timestamp)) (contracts/core/NFTFactory.sol#61-63)
+NFTFactory.createERC1155Collection(string,string,string,address,uint96) (contracts/core/NFTFactory.sol#85-116) calls abi.encodePacked() with multiple dynamic arguments:
+	- salt = keccak256(bytes)(abi.encodePacked(msg.sender,name,symbol,block.timestamp)) (contracts/core/NFTFactory.sol#94-96)
+NFTFactory.predictERC721Address(address,string,string,uint256) (contracts/core/NFTFactory.sol#118-128) calls abi.encodePacked() with multiple dynamic arguments:
+	- salt = keccak256(bytes)(abi.encodePacked(creator,name,symbol,timestamp)) (contracts/core/NFTFactory.sol#124-126)
+NFTFactory.predictERC1155Address(address,string,string,uint256) (contracts/core/NFTFactory.sol#130-140) calls abi.encodePacked() with multiple dynamic arguments:
+	- salt = keccak256(bytes)(abi.encodePacked(creator,name,symbol,timestamp)) (contracts/core/NFTFactory.sol#136-138)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#abi-encodePacked-collision
+INFO:Detectors:
+Contract locking ether found:
+	Contract FractionalVault (contracts/advanced/FractionalVault.sol#9-161) has payable functions:
+	 - FractionalVault.buyout(uint256) (contracts/advanced/FractionalVault.sol#103-118)
+	But does not have a function to withdraw the ether
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#contracts-that-lock-ether
+INFO:Detectors:
+Reentrancy in ERC721NFT.batchMint(address,uint256,string) (contracts/tokens/erc721/ERC721NFT.sol#79-114):
+	External calls:
+	- _safeMint(to,tokenId) (contracts/tokens/erc721/ERC721NFT.sol#100)
+		- retval = IERC721Receiver(to).onERC721Received(operator,from,tokenId,data) (node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol#33-47)
+		- ERC721Utils.checkOnERC721Received(_msgSender(),address(0),to,tokenId,data) (node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol#289)
+	State variables written after the call(s):
+	- tokenId = _tokenIdCounter ++ (contracts/tokens/erc721/ERC721NFT.sol#99)
+	ERC721NFT._tokenIdCounter (contracts/tokens/erc721/ERC721NFT.sol#19) can be used in cross function reentrancies:
+	- ERC721NFT.batchMint(address,uint256,string) (contracts/tokens/erc721/ERC721NFT.sol#79-114)
+	- ERC721NFT.mint(address,string) (contracts/tokens/erc721/ERC721NFT.sol#55-77)
+	- ERC721NFT.setMaxSupply(uint256) (contracts/tokens/erc721/ERC721NFT.sol#140-147)
+	- ERC721NFT.totalSupply() (contracts/tokens/erc721/ERC721NFT.sol#169-171)
+Reentrancy in ERC721NFTInitializable.batchMint(address,uint256,string) (contracts/tokens/erc721/ERC721NFTInitializable.sol#82-110):
+	External calls:
+	- _safeMint(to,tokenId) (contracts/tokens/erc721/ERC721NFTInitializable.sol#98)
+		- ERC721Utils.checkOnERC721Received(_msgSender(),address(0),to,tokenId,data) (node_modules/@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol#316)
+		- retval = IERC721Receiver(to).onERC721Received(operator,from,tokenId,data) (node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol#33-47)
+	State variables written after the call(s):
+	- _setTokenURI(tokenId,string(abi.encodePacked(baseURI,_toString(tokenId)))) (contracts/tokens/erc721/ERC721NFTInitializable.sol#100-103)
+		- $ = ERC721URIStorageStorageLocation (node_modules/@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol#34)
+	ERC721URIStorageUpgradeable.ERC721URIStorageStorageLocation (node_modules/@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol#30) can be used in cross function reentrancies:
+	- ERC721URIStorageUpgradeable._getERC721URIStorageStorage() (node_modules/@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol#32-36)
+	- tokenId = _tokenIdCounter ++ (contracts/tokens/erc721/ERC721NFTInitializable.sol#97)
+	ERC721NFTInitializable._tokenIdCounter (contracts/tokens/erc721/ERC721NFTInitializable.sol#21) can be used in cross function reentrancies:
+	- ERC721NFTInitializable.batchMint(address,uint256,string) (contracts/tokens/erc721/ERC721NFTInitializable.sol#82-110)
+	- ERC721NFTInitializable.mint(address,string) (contracts/tokens/erc721/ERC721NFTInitializable.sol#65-80)
+	- ERC721NFTInitializable.setMaxSupply(uint256) (contracts/tokens/erc721/ERC721NFTInitializable.sol#136-143)
+	- ERC721NFTInitializable.totalSupply() (contracts/tokens/erc721/ERC721NFTInitializable.sol#165-167)
+Reentrancy in FractionalVault.fractionalize(address,uint256,uint256,uint256,string,string) (contracts/advanced/FractionalVault.sol#56-101):
+	External calls:
+	- IERC721(nftContract).transferFrom(msg.sender,address(this),tokenId) (contracts/advanced/FractionalVault.sol#67)
+	State variables written after the call(s):
+	- nftToVault[nftContract] = vaultId (contracts/advanced/FractionalVault.sol#89)
+	FractionalVault.nftToVault (contracts/advanced/FractionalVault.sol#29) can be used in cross function reentrancies:
+	- FractionalVault.nftToVault (contracts/advanced/FractionalVault.sol#29)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-1
+INFO:Detectors:
+Marketplace._executeSale(Marketplace.Listing,address,uint256).royaltyRecipient (contracts/core/Marketplace.sol#323) is a local variable never initialized
+AuctionEngine._distributePayment(AuctionEngine.Auction,uint256).royaltyRecipient (contracts/core/AuctionEngine.sol#379) is a local variable never initialized
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#uninitialized-local-variables
+INFO:Detectors:
+LazyMinting.redeem(LazyMinting.NFTVoucher,bytes) (contracts/advanced/LazyMinting.sol#60-87) ignores return value by nft.mint(msg.sender,voucher.uri) (contracts/advanced/LazyMinting.sol#75)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unused-return
+INFO:Detectors:
+ShareToken.constructor(string,string,uint256,address).name (contracts/advanced/FractionalVault.sol#167) shadows:
+	- ERC20.name() (node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol#52-54) (function)
+	- IERC20Metadata.name() (node_modules/@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol#15) (function)
+ShareToken.constructor(string,string,uint256,address).symbol (contracts/advanced/FractionalVault.sol#168) shadows:
+	- ERC20.symbol() (node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol#60-62) (function)
+	- IERC20Metadata.symbol() (node_modules/@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol#20) (function)
+ShareToken.constructor(string,string,uint256,address).totalSupply (contracts/advanced/FractionalVault.sol#169) shadows:
+	- ERC20.totalSupply() (node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol#82-84) (function)
+	- IERC20.totalSupply() (node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol#27) (function)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#local-variable-shadowing
+INFO:Detectors:
+LazyMinting.setPlatformFee(uint256) (contracts/advanced/LazyMinting.sol#136-139) should emit an event for: 
+	- platformFee = newFee (contracts/advanced/LazyMinting.sol#138) 
+AuctionEngine.setPlatformFee(uint256) (contracts/core/AuctionEngine.sol#422-425) should emit an event for: 
+	- platformFee = newFee (contracts/core/AuctionEngine.sol#424) 
+AuctionEngine.setAntiSnipingDuration(uint256) (contracts/core/AuctionEngine.sol#432-434) should emit an event for: 
+	- antiSnipingDuration = duration (contracts/core/AuctionEngine.sol#433) 
+AuctionEngine.setMinBidIncrement(uint256) (contracts/core/AuctionEngine.sol#436-438) should emit an event for: 
+	- minBidIncrementBps = bps (contracts/core/AuctionEngine.sol#437) 
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#missing-events-arithmetic
+INFO:Detectors:
+NFTFactory.constructor(address,address)._erc721Implementation (contracts/core/NFTFactory.sol#45) lacks a zero-check on :
+		- erc721Implementation = _erc721Implementation (contracts/core/NFTFactory.sol#48)
+NFTFactory.constructor(address,address)._erc1155Implementation (contracts/core/NFTFactory.sol#46) lacks a zero-check on :
+		- erc1155Implementation = _erc1155Implementation (contracts/core/NFTFactory.sol#49)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#missing-zero-address-validation
+INFO:Detectors:
+Reentrancy in ERC721NFT.batchMint(address,uint256,string) (contracts/tokens/erc721/ERC721NFT.sol#79-114):
+	External calls:
+	- _safeMint(to,tokenId) (contracts/tokens/erc721/ERC721NFT.sol#100)
+		- retval = IERC721Receiver(to).onERC721Received(operator,from,tokenId,data) (node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol#33-47)
+		- ERC721Utils.checkOnERC721Received(_msgSender(),address(0),to,tokenId,data) (node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol#289)
+	State variables written after the call(s):
+	- _setTokenURI(tokenId,string(abi.encodePacked(baseURI,_toString(tokenId)))) (contracts/tokens/erc721/ERC721NFT.sol#103-106)
+		- _tokenURIs[tokenId] = _tokenURI (node_modules/@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol#55)
+Reentrancy in AuctionEngine.createDutchAuction(address,uint256,uint256,uint256,uint256) (contracts/core/AuctionEngine.sol#141-178):
+	External calls:
+	- IERC721(nftContract).safeTransferFrom(msg.sender,address(this),tokenId) (contracts/core/AuctionEngine.sol#151-155)
+	State variables written after the call(s):
+	- auctionId = _auctionIdCounter ++ (contracts/core/AuctionEngine.sol#157)
+	- auctions[auctionId] = Auction({seller:msg.sender,nftContract:nftContract,tokenId:tokenId,amount:1,tokenType:TokenType.ERC721,auctionType:AuctionType.Dutch,status:AuctionStatus.Active,startPrice:startPrice,reservePrice:0,endPrice:endPrice,startTime:block.timestamp,endTime:block.timestamp + duration,highestBidder:address(0),highestBid:0}) (contracts/core/AuctionEngine.sol#159-174)
+Reentrancy in AuctionEngine.createERC1155Auction(address,uint256,uint256,uint256,uint256,uint256) (contracts/core/AuctionEngine.sol#180-220):
+	External calls:
+	- IERC1155(nftContract).safeTransferFrom(msg.sender,address(this),tokenId,amount,) (contracts/core/AuctionEngine.sol#191-197)
+	State variables written after the call(s):
+	- auctionId = _auctionIdCounter ++ (contracts/core/AuctionEngine.sol#199)
+	- auctions[auctionId] = Auction({seller:msg.sender,nftContract:nftContract,tokenId:tokenId,amount:amount,tokenType:TokenType.ERC1155,auctionType:AuctionType.English,status:AuctionStatus.Active,startPrice:startPrice,reservePrice:reservePrice,endPrice:0,startTime:block.timestamp,endTime:block.timestamp + duration,highestBidder:address(0),highestBid:0}) (contracts/core/AuctionEngine.sol#201-216)
+Reentrancy in NFTFactory.createERC1155Collection(string,string,string,address,uint96) (contracts/core/NFTFactory.sol#85-116):
+	External calls:
+	- ERC1155NFTInitializable(clone).initialize(name,symbol,baseURI,royaltyReceiver,royaltyFee,msg.sender) (contracts/core/NFTFactory.sol#100-107)
+	State variables written after the call(s):
+	- creatorToCollections[msg.sender].push(clone) (contracts/core/NFTFactory.sol#110)
+	- deployedERC1155Collections.push(clone) (contracts/core/NFTFactory.sol#109)
+	- isFactoryCollection[clone] = true (contracts/core/NFTFactory.sol#111)
+Reentrancy in NFTFactory.createERC721Collection(string,string,uint256,address,uint96) (contracts/core/NFTFactory.sol#52-83):
+	External calls:
+	- ERC721NFTInitializable(clone).initialize(name,symbol,maxSupply,royaltyReceiver,royaltyFee,msg.sender) (contracts/core/NFTFactory.sol#67-74)
+	State variables written after the call(s):
+	- creatorToCollections[msg.sender].push(clone) (contracts/core/NFTFactory.sol#77)
+	- deployedERC721Collections.push(clone) (contracts/core/NFTFactory.sol#76)
+	- isFactoryCollection[clone] = true (contracts/core/NFTFactory.sol#78)
+Reentrancy in AuctionEngine.createEnglishAuction(address,uint256,uint256,uint256,uint256) (contracts/core/AuctionEngine.sol#102-139):
+	External calls:
+	- IERC721(nftContract).safeTransferFrom(msg.sender,address(this),tokenId) (contracts/core/AuctionEngine.sol#112-116)
+	State variables written after the call(s):
+	- auctionId = _auctionIdCounter ++ (contracts/core/AuctionEngine.sol#118)
+	- auctions[auctionId] = Auction({seller:msg.sender,nftContract:nftContract,tokenId:tokenId,amount:1,tokenType:TokenType.ERC721,auctionType:AuctionType.English,status:AuctionStatus.Active,startPrice:startPrice,reservePrice:reservePrice,endPrice:0,startTime:block.timestamp,endTime:block.timestamp + duration,highestBidder:address(0),highestBid:0}) (contracts/core/AuctionEngine.sol#120-135)
+Reentrancy in AuctionEngine.endAuction(uint256) (contracts/core/AuctionEngine.sol#305-331):
+	External calls:
+	- _transferNFT(auction,auction.seller) (contracts/core/AuctionEngine.sol#325)
+		- IERC721(auction.nftContract).safeTransferFrom(address(this),to,auction.tokenId) (contracts/core/AuctionEngine.sol#357-361)
+		- IERC1155(auction.nftContract).safeTransferFrom(address(this),to,auction.tokenId,auction.amount,) (contracts/core/AuctionEngine.sol#363-369)
+	State variables written after the call(s):
+	- pendingReturns[auction.highestBidder] += auction.highestBid (contracts/core/AuctionEngine.sol#327)
+Reentrancy in FractionalVault.fractionalize(address,uint256,uint256,uint256,string,string) (contracts/advanced/FractionalVault.sol#56-101):
+	External calls:
+	- IERC721(nftContract).transferFrom(msg.sender,address(this),tokenId) (contracts/advanced/FractionalVault.sol#67)
+	State variables written after the call(s):
+	- vaultId = _vaultIdCounter ++ (contracts/advanced/FractionalVault.sol#76)
+	- vaults[vaultId] = Vault({nftContract:nftContract,tokenId:tokenId,curator:msg.sender,shareToken:address(shareToken),totalShares:totalShares,reservePrice:reservePrice,state:VaultState.Active,createdAt:block.timestamp}) (contracts/advanced/FractionalVault.sol#78-87)
+Reentrancy in Marketplace.listERC1155(address,uint256,uint256,uint256) (contracts/core/Marketplace.sol#156-197):
+	External calls:
+	- nft.safeTransferFrom(msg.sender,address(this),tokenId,amount,) (contracts/core/Marketplace.sol#168)
+	State variables written after the call(s):
+	- listingId = _listingIdCounter ++ (contracts/core/Marketplace.sol#170)
+	- activeListingId[msg.sender][nftContract][tokenId] = listingId (contracts/core/Marketplace.sol#184)
+	- listings[listingId] = Listing({seller:msg.sender,nftContract:nftContract,tokenId:tokenId,amount:amount,price:price,tokenType:TokenType.ERC1155,status:ListingStatus.Active,createdAt:block.timestamp}) (contracts/core/Marketplace.sol#172-181)
+	- userListings[msg.sender].push(listingId) (contracts/core/Marketplace.sol#183)
+Reentrancy in Marketplace.listERC721(address,uint256,uint256) (contracts/core/Marketplace.sol#114-154):
+	External calls:
+	- nft.safeTransferFrom(msg.sender,address(this),tokenId) (contracts/core/Marketplace.sol#125)
+	State variables written after the call(s):
+	- listingId = _listingIdCounter ++ (contracts/core/Marketplace.sol#127)
+	- activeListingId[msg.sender][nftContract][tokenId] = listingId (contracts/core/Marketplace.sol#141)
+	- listings[listingId] = Listing({seller:msg.sender,nftContract:nftContract,tokenId:tokenId,amount:1,price:price,tokenType:TokenType.ERC721,status:ListingStatus.Active,createdAt:block.timestamp}) (contracts/core/Marketplace.sol#129-138)
+	- userListings[msg.sender].push(listingId) (contracts/core/Marketplace.sol#140)
+Reentrancy in ERC1155NFT.mint(address,uint256,string) (contracts/tokens/erc1155/ERC1155NFT.sol#65-85):
+	External calls:
+	- _mint(to,tokenId,amount,) (contracts/tokens/erc1155/ERC1155NFT.sol#79)
+		- response = IERC1155Receiver(to).onERC1155BatchReceived(operator,from,ids,values,data) (node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Utils.sol#69-85)
+		- response = IERC1155Receiver(to).onERC1155Received(operator,from,id,value,data) (node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Utils.sol#34-48)
+		- ERC1155Utils.checkOnERC1155Received(operator,from,to,id,value,data) (node_modules/@openzeppelin/contracts/token/ERC1155/ERC1155.sol#194)
+		- ERC1155Utils.checkOnERC1155BatchReceived(operator,from,to,ids,values,data) (node_modules/@openzeppelin/contracts/token/ERC1155/ERC1155.sol#196)
+	State variables written after the call(s):
+	- _tokenURIs[tokenId] = tokenURI_ (contracts/tokens/erc1155/ERC1155NFT.sol#80)
+Reentrancy in ERC1155NFTInitializable.mint(address,uint256,string) (contracts/tokens/erc1155/ERC1155NFTInitializable.sol#75-90):
+	External calls:
+	- _mint(to,tokenId,amount,) (contracts/tokens/erc1155/ERC1155NFTInitializable.sol#85)
+		- response = IERC1155Receiver(to).onERC1155BatchReceived(operator,from,ids,values,data) (node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Utils.sol#69-85)
+		- response = IERC1155Receiver(to).onERC1155Received(operator,from,id,value,data) (node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Utils.sol#34-48)
+		- ERC1155Utils.checkOnERC1155Received(operator,from,to,id,value,data) (node_modules/@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol#216)
+		- ERC1155Utils.checkOnERC1155BatchReceived(operator,from,to,ids,values,data) (node_modules/@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol#218)
+	State variables written after the call(s):
+	- _tokenURIs[tokenId] = tokenURI_ (contracts/tokens/erc1155/ERC1155NFTInitializable.sol#86)
+Reentrancy in ERC721NFT.mint(address,string) (contracts/tokens/erc721/ERC721NFT.sol#55-77):
+	External calls:
+	- _safeMint(to,tokenId) (contracts/tokens/erc721/ERC721NFT.sol#71)
+		- retval = IERC721Receiver(to).onERC721Received(operator,from,tokenId,data) (node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol#33-47)
+		- ERC721Utils.checkOnERC721Received(_msgSender(),address(0),to,tokenId,data) (node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol#289)
+	State variables written after the call(s):
+	- _setTokenURI(tokenId,uri) (contracts/tokens/erc721/ERC721NFT.sol#72)
+		- _tokenURIs[tokenId] = _tokenURI (node_modules/@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol#55)
+Reentrancy in ERC721NFTInitializable.mint(address,string) (contracts/tokens/erc721/ERC721NFTInitializable.sol#65-80):
+	External calls:
+	- _safeMint(to,tokenId) (contracts/tokens/erc721/ERC721NFTInitializable.sol#75)
+		- ERC721Utils.checkOnERC721Received(_msgSender(),address(0),to,tokenId,data) (node_modules/@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol#316)
+		- retval = IERC721Receiver(to).onERC721Received(operator,from,tokenId,data) (node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol#33-47)
+	State variables written after the call(s):
+	- _setTokenURI(tokenId,uri) (contracts/tokens/erc721/ERC721NFTInitializable.sol#76)
+		- $ = ERC721URIStorageStorageLocation (node_modules/@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol#34)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-2
+INFO:Detectors:
+Reentrancy in ERC721NFT.batchMint(address,uint256,string) (contracts/tokens/erc721/ERC721NFT.sol#79-114):
+	External calls:
+	- _safeMint(to,tokenId) (contracts/tokens/erc721/ERC721NFT.sol#100)
+		- retval = IERC721Receiver(to).onERC721Received(operator,from,tokenId,data) (node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol#33-47)
+		- ERC721Utils.checkOnERC721Received(_msgSender(),address(0),to,tokenId,data) (node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol#289)
+	Event emitted after the call(s):
+	- BatchMinted(to,startTokenId,quantity) (contracts/tokens/erc721/ERC721NFT.sol#111)
+	- MetadataUpdate(tokenId) (node_modules/@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol#56)
+		- _setTokenURI(tokenId,string(abi.encodePacked(baseURI,_toString(tokenId)))) (contracts/tokens/erc721/ERC721NFT.sol#103-106)
+Reentrancy in ERC721NFTInitializable.batchMint(address,uint256,string) (contracts/tokens/erc721/ERC721NFTInitializable.sol#82-110):
+	External calls:
+	- _safeMint(to,tokenId) (contracts/tokens/erc721/ERC721NFTInitializable.sol#98)
+		- ERC721Utils.checkOnERC721Received(_msgSender(),address(0),to,tokenId,data) (node_modules/@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol#316)
+		- retval = IERC721Receiver(to).onERC721Received(operator,from,tokenId,data) (node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol#33-47)
+	Event emitted after the call(s):
+	- BatchMinted(to,startTokenId,quantity) (contracts/tokens/erc721/ERC721NFTInitializable.sol#108)
+	- MetadataUpdate(tokenId) (node_modules/@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol#76)
+		- _setTokenURI(tokenId,string(abi.encodePacked(baseURI,_toString(tokenId)))) (contracts/tokens/erc721/ERC721NFTInitializable.sol#100-103)
+Reentrancy in NFTFactory.createERC1155Collection(string,string,string,address,uint96) (contracts/core/NFTFactory.sol#85-116):
+	External calls:
+	- ERC1155NFTInitializable(clone).initialize(name,symbol,baseURI,royaltyReceiver,royaltyFee,msg.sender) (contracts/core/NFTFactory.sol#100-107)
+	Event emitted after the call(s):
+	- ERC1155CollectionCreated(clone,msg.sender,name,symbol) (contracts/core/NFTFactory.sol#113)
+Reentrancy in NFTFactory.createERC721Collection(string,string,uint256,address,uint96) (contracts/core/NFTFactory.sol#52-83):
+	External calls:
+	- ERC721NFTInitializable(clone).initialize(name,symbol,maxSupply,royaltyReceiver,royaltyFee,msg.sender) (contracts/core/NFTFactory.sol#67-74)
+	Event emitted after the call(s):
+	- ERC721CollectionCreated(clone,msg.sender,name,symbol) (contracts/core/NFTFactory.sol#80)
+Reentrancy in ERC1155NFT.mint(address,uint256,string) (contracts/tokens/erc1155/ERC1155NFT.sol#65-85):
+	External calls:
+	- _mint(to,tokenId,amount,) (contracts/tokens/erc1155/ERC1155NFT.sol#79)
+		- response = IERC1155Receiver(to).onERC1155BatchReceived(operator,from,ids,values,data) (node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Utils.sol#69-85)
+		- response = IERC1155Receiver(to).onERC1155Received(operator,from,id,value,data) (node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Utils.sol#34-48)
+		- ERC1155Utils.checkOnERC1155Received(operator,from,to,id,value,data) (node_modules/@openzeppelin/contracts/token/ERC1155/ERC1155.sol#194)
+		- ERC1155Utils.checkOnERC1155BatchReceived(operator,from,to,ids,values,data) (node_modules/@openzeppelin/contracts/token/ERC1155/ERC1155.sol#196)
+	Event emitted after the call(s):
+	- TokenMinted(to,tokenId,amount,tokenURI_) (contracts/tokens/erc1155/ERC1155NFT.sol#82)
+Reentrancy in ERC1155NFTInitializable.mint(address,uint256,string) (contracts/tokens/erc1155/ERC1155NFTInitializable.sol#75-90):
+	External calls:
+	- _mint(to,tokenId,amount,) (contracts/tokens/erc1155/ERC1155NFTInitializable.sol#85)
+		- response = IERC1155Receiver(to).onERC1155BatchReceived(operator,from,ids,values,data) (node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Utils.sol#69-85)
+		- response = IERC1155Receiver(to).onERC1155Received(operator,from,id,value,data) (node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Utils.sol#34-48)
+		- ERC1155Utils.checkOnERC1155Received(operator,from,to,id,value,data) (node_modules/@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol#216)
+		- ERC1155Utils.checkOnERC1155BatchReceived(operator,from,to,ids,values,data) (node_modules/@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol#218)
+	Event emitted after the call(s):
+	- TokenMinted(to,tokenId,amount,tokenURI_) (contracts/tokens/erc1155/ERC1155NFTInitializable.sol#88)
+Reentrancy in ERC721NFT.mint(address,string) (contracts/tokens/erc721/ERC721NFT.sol#55-77):
+	External calls:
+	- _safeMint(to,tokenId) (contracts/tokens/erc721/ERC721NFT.sol#71)
+		- retval = IERC721Receiver(to).onERC721Received(operator,from,tokenId,data) (node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol#33-47)
+		- ERC721Utils.checkOnERC721Received(_msgSender(),address(0),to,tokenId,data) (node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol#289)
+	Event emitted after the call(s):
+	- MetadataUpdate(tokenId) (node_modules/@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol#56)
+		- _setTokenURI(tokenId,uri) (contracts/tokens/erc721/ERC721NFT.sol#72)
+	- TokenMinted(to,tokenId,uri) (contracts/tokens/erc721/ERC721NFT.sol#74)
+Reentrancy in ERC721NFTInitializable.mint(address,string) (contracts/tokens/erc721/ERC721NFTInitializable.sol#65-80):
+	External calls:
+	- _safeMint(to,tokenId) (contracts/tokens/erc721/ERC721NFTInitializable.sol#75)
+		- ERC721Utils.checkOnERC721Received(_msgSender(),address(0),to,tokenId,data) (node_modules/@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol#316)
+		- retval = IERC721Receiver(to).onERC721Received(operator,from,tokenId,data) (node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol#33-47)
+	Event emitted after the call(s):
+	- MetadataUpdate(tokenId) (node_modules/@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol#76)
+		- _setTokenURI(tokenId,uri) (contracts/tokens/erc721/ERC721NFTInitializable.sol#76)
+	- TokenMinted(to,tokenId,uri) (contracts/tokens/erc721/ERC721NFTInitializable.sol#78)
+Reentrancy in ERC1155NFT.mintBatch(address,uint256[],string[]) (contracts/tokens/erc1155/ERC1155NFT.sol#108-135):
+	External calls:
+	- _mintBatch(to,tokenIds,amounts,) (contracts/tokens/erc1155/ERC1155NFT.sol#130)
+		- response = IERC1155Receiver(to).onERC1155BatchReceived(operator,from,ids,values,data) (node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Utils.sol#69-85)
+		- response = IERC1155Receiver(to).onERC1155Received(operator,from,id,value,data) (node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Utils.sol#34-48)
+		- ERC1155Utils.checkOnERC1155Received(operator,from,to,id,value,data) (node_modules/@openzeppelin/contracts/token/ERC1155/ERC1155.sol#194)
+		- ERC1155Utils.checkOnERC1155BatchReceived(operator,from,to,ids,values,data) (node_modules/@openzeppelin/contracts/token/ERC1155/ERC1155.sol#196)
+	Event emitted after the call(s):
+	- BatchMinted(to,tokenIds,amounts) (contracts/tokens/erc1155/ERC1155NFT.sol#132)
+Reentrancy in ERC1155NFTInitializable.mintBatch(address,uint256[],string[]) (contracts/tokens/erc1155/ERC1155NFTInitializable.sol#110-132):
+	External calls:
+	- _mintBatch(to,tokenIds,amounts,) (contracts/tokens/erc1155/ERC1155NFTInitializable.sol#129)
+		- response = IERC1155Receiver(to).onERC1155BatchReceived(operator,from,ids,values,data) (node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Utils.sol#69-85)
+		- response = IERC1155Receiver(to).onERC1155Received(operator,from,id,value,data) (node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Utils.sol#34-48)
+		- ERC1155Utils.checkOnERC1155Received(operator,from,to,id,value,data) (node_modules/@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol#216)
+		- ERC1155Utils.checkOnERC1155BatchReceived(operator,from,to,ids,values,data) (node_modules/@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol#218)
+	Event emitted after the call(s):
+	- BatchMinted(to,tokenIds,amounts) (contracts/tokens/erc1155/ERC1155NFTInitializable.sol#130)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-3
+INFO:Detectors:
+MetaTransactionHandler.executeMetaTransaction(MetaTransactionHandler.MetaTransaction,bytes) (contracts/advanced/MetaTransactionHandler.sol#45-72) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp > metaTx.deadline (contracts/advanced/MetaTransactionHandler.sol#50)
+AuctionEngine.placeBid(uint256) (contracts/core/AuctionEngine.sol#222-235) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= auction.endTime (contracts/core/AuctionEngine.sol#228)
+AuctionEngine._handleEnglishBid(uint256,AuctionEngine.Auction) (contracts/core/AuctionEngine.sol#237-266) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp + antiSnipingDuration > auction.endTime (contracts/core/AuctionEngine.sol#260)
+AuctionEngine._handleDutchBid(uint256,AuctionEngine.Auction) (contracts/core/AuctionEngine.sol#268-291) uses timestamp for comparisons
+	Dangerous comparisons:
+	- msg.value < currentPrice (contracts/core/AuctionEngine.sol#273)
+	- msg.value > currentPrice (contracts/core/AuctionEngine.sol#283)
+AuctionEngine.getDutchPrice(uint256) (contracts/core/AuctionEngine.sol#293-303) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= a.endTime (contracts/core/AuctionEngine.sol#296)
+AuctionEngine.endAuction(uint256) (contracts/core/AuctionEngine.sol#305-331) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < auction.endTime (contracts/core/AuctionEngine.sol#309)
+AuctionEngine._distributePayment(AuctionEngine.Auction,uint256) (contracts/core/AuctionEngine.sol#373-405) uses timestamp for comparisons
+	Dangerous comparisons:
+	- platformAmount > 0 (contracts/core/AuctionEngine.sol#389)
+	- royaltyAmount > 0 && royaltyRecipient != address(0) (contracts/core/AuctionEngine.sol#395)
+AuctionEngine.isActive(uint256) (contracts/core/AuctionEngine.sol#417-420) uses timestamp for comparisons
+	Dangerous comparisons:
+	- a.status == AuctionStatus.Active && block.timestamp < a.endTime (contracts/core/AuctionEngine.sol#419)
+Marketplace.acceptOffer(uint256,uint256) (contracts/core/Marketplace.sol#275-296) uses timestamp for comparisons
+	Dangerous comparisons:
+	- offer.expiresAt != 0 && block.timestamp > offer.expiresAt (contracts/core/Marketplace.sol#286)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#block-timestamp
+INFO:Detectors:
+5 different versions of Solidity are used:
+	- Version constraint ^0.8.20 is used by:
+		-^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155BurnableUpgradeable.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155SupplyUpgradeable.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721BurnableUpgradeable.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/token/common/ERC2981Upgradeable.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/access/Ownable.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/proxy/Clones.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC1155/ERC1155.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Burnable.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Utils.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/token/common/ERC2981.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/Arrays.sol#5)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/Comparators.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/Context.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/Create2.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/Errors.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/Panic.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/Pausable.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/ReentrancyGuard.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/ShortStrings.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/SlotDerivation.sol#5)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#5)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/Strings.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/cryptography/ECDSA.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/cryptography/EIP712.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/introspection/ERC165.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/math/Math.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/math/SafeCast.sol#5)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/math/SignedMath.sol#4)
+		-^0.8.20 (contracts/advanced/FractionalVault.sol#2)
+		-^0.8.20 (contracts/advanced/LazyMinting.sol#2)
+		-^0.8.20 (contracts/advanced/MetaTransactionHandler.sol#2)
+		-^0.8.20 (contracts/core/AuctionEngine.sol#2)
+		-^0.8.20 (contracts/core/Marketplace.sol#2)
+		-^0.8.20 (contracts/core/NFTFactory.sol#2)
+		-^0.8.20 (contracts/tokens/erc1155/ERC1155NFT.sol#2)
+		-^0.8.20 (contracts/tokens/erc1155/ERC1155NFTInitializable.sol#2)
+		-^0.8.20 (contracts/tokens/erc721/ERC721NFT.sol#2)
+		-^0.8.20 (contracts/tokens/erc721/ERC721NFTInitializable.sol#2)
+	- Version constraint >=0.4.16 is used by:
+		->=0.4.16 (node_modules/@openzeppelin/contracts/interfaces/IERC165.sol#4)
+		->=0.4.16 (node_modules/@openzeppelin/contracts/interfaces/IERC5267.sol#4)
+		->=0.4.16 (node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol#4)
+		->=0.4.16 (node_modules/@openzeppelin/contracts/utils/introspection/IERC165.sol#4)
+	- Version constraint >=0.6.2 is used by:
+		->=0.6.2 (node_modules/@openzeppelin/contracts/interfaces/IERC2981.sol#4)
+		->=0.6.2 (node_modules/@openzeppelin/contracts/interfaces/IERC4906.sol#4)
+		->=0.6.2 (node_modules/@openzeppelin/contracts/interfaces/IERC721.sol#4)
+		->=0.6.2 (node_modules/@openzeppelin/contracts/token/ERC1155/IERC1155.sol#4)
+		->=0.6.2 (node_modules/@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol#4)
+		->=0.6.2 (node_modules/@openzeppelin/contracts/token/ERC1155/extensions/IERC1155MetadataURI.sol#4)
+		->=0.6.2 (node_modules/@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol#4)
+		->=0.6.2 (node_modules/@openzeppelin/contracts/token/ERC721/IERC721.sol#4)
+		->=0.6.2 (node_modules/@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol#4)
+	- Version constraint >=0.8.4 is used by:
+		->=0.8.4 (node_modules/@openzeppelin/contracts/interfaces/draft-IERC6093.sol#3)
+	- Version constraint >=0.5.0 is used by:
+		->=0.5.0 (node_modules/@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol#4)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#different-pragma-directives-are-used
+INFO:Detectors:
+ERC1155NFT.mintBatch(address,uint256[],string[]) (contracts/tokens/erc1155/ERC1155NFT.sol#108-135) has costly operations inside a loop:
+	- tokenIds[i] = _tokenIdCounter ++ (contracts/tokens/erc1155/ERC1155NFT.sol#125)
+ERC1155NFTInitializable.mintBatch(address,uint256[],string[]) (contracts/tokens/erc1155/ERC1155NFTInitializable.sol#110-132) has costly operations inside a loop:
+	- tokenIds[i] = _tokenIdCounter ++ (contracts/tokens/erc1155/ERC1155NFTInitializable.sol#124)
+ERC721NFT.batchMint(address,uint256,string) (contracts/tokens/erc721/ERC721NFT.sol#79-114) has costly operations inside a loop:
+	- tokenId = _tokenIdCounter ++ (contracts/tokens/erc721/ERC721NFT.sol#99)
+ERC721NFTInitializable.batchMint(address,uint256,string) (contracts/tokens/erc721/ERC721NFTInitializable.sol#82-110) has costly operations inside a loop:
+	- tokenId = _tokenIdCounter ++ (contracts/tokens/erc721/ERC721NFTInitializable.sol#97)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#costly-operations-inside-a-loop
+INFO:Detectors:
+Version constraint ^0.8.20 contains known severe issues (https://solidity.readthedocs.io/en/latest/bugs.html)
+	- VerbatimInvalidDeduplication
+	- FullInlinerNonExpressionSplitArgumentEvaluationOrder
+	- MissingSideEffectsOnSelectorAccess.
+It is used by:
+	- ^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155BurnableUpgradeable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155SupplyUpgradeable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721BurnableUpgradeable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/token/common/ERC2981Upgradeable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/access/Ownable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/proxy/Clones.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC1155/ERC1155.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Burnable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC1155/utils/ERC1155Utils.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/common/ERC2981.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/Arrays.sol#5)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/Comparators.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/Context.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/Create2.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/Errors.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/Panic.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/Pausable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/ReentrancyGuard.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/ShortStrings.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/SlotDerivation.sol#5)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#5)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/Strings.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/cryptography/ECDSA.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/cryptography/EIP712.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/introspection/ERC165.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/math/Math.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/math/SafeCast.sol#5)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/math/SignedMath.sol#4)
+	- ^0.8.20 (contracts/advanced/FractionalVault.sol#2)
+	- ^0.8.20 (contracts/advanced/LazyMinting.sol#2)
+	- ^0.8.20 (contracts/advanced/MetaTransactionHandler.sol#2)
+	- ^0.8.20 (contracts/core/AuctionEngine.sol#2)
+	- ^0.8.20 (contracts/core/Marketplace.sol#2)
+	- ^0.8.20 (contracts/core/NFTFactory.sol#2)
+	- ^0.8.20 (contracts/tokens/erc1155/ERC1155NFT.sol#2)
+	- ^0.8.20 (contracts/tokens/erc1155/ERC1155NFTInitializable.sol#2)
+	- ^0.8.20 (contracts/tokens/erc721/ERC721NFT.sol#2)
+	- ^0.8.20 (contracts/tokens/erc721/ERC721NFTInitializable.sol#2)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#incorrect-versions-of-solidity
+INFO:Detectors:
+Low level call in LazyMinting.redeem(LazyMinting.NFTVoucher,bytes) (contracts/advanced/LazyMinting.sol#60-87):
+	- (success,None) = address(msg.sender).call{value: msg.value - voucher.price}() (contracts/advanced/LazyMinting.sol#80)
+Low level call in LazyMinting._distributePayment(LazyMinting.NFTVoucher) (contracts/advanced/LazyMinting.sol#111-128):
+	- (feeSuccess,None) = address(feeRecipient).call{value: platformAmount}() (contracts/advanced/LazyMinting.sol#117)
+	- (royaltySuccess,None) = address(voucher.creator).call{value: royaltyAmount}() (contracts/advanced/LazyMinting.sol#122)
+	- (creatorSuccess,None) = address(voucher.creator).call{value: creatorAmount}() (contracts/advanced/LazyMinting.sol#126)
+Low level call in MetaTransactionHandler.executeMetaTransaction(MetaTransactionHandler.MetaTransaction,bytes) (contracts/advanced/MetaTransactionHandler.sol#45-72):
+	- (success,returnData) = metaTx.to.call{value: metaTx.value}(metaTx.data) (contracts/advanced/MetaTransactionHandler.sol#58-60)
+Low level call in AuctionEngine._handleDutchBid(uint256,AuctionEngine.Auction) (contracts/core/AuctionEngine.sol#268-291):
+	- (success,None) = address(msg.sender).call{value: msg.value - currentPrice}() (contracts/core/AuctionEngine.sol#284-286)
+Low level call in AuctionEngine.withdrawPendingReturns() (contracts/core/AuctionEngine.sol#346-353):
+	- (success,None) = address(msg.sender).call{value: amount}() (contracts/core/AuctionEngine.sol#351)
+Low level call in AuctionEngine._distributePayment(AuctionEngine.Auction,uint256) (contracts/core/AuctionEngine.sol#373-405):
+	- (feeSuccess,None) = address(feeRecipient).call{value: platformAmount}() (contracts/core/AuctionEngine.sol#390-392)
+	- (royaltySuccess,None) = address(royaltyRecipient).call{value: royaltyAmount}() (contracts/core/AuctionEngine.sol#396-398)
+	- (sellerSuccess,None) = address(auction.seller).call{value: sellerAmount}() (contracts/core/AuctionEngine.sol#401-403)
+Low level call in Marketplace.cancelOffer(uint256,uint256) (contracts/core/Marketplace.sol#298-314):
+	- (success,None) = address(msg.sender).call{value: refund}() (contracts/core/Marketplace.sol#310)
+Low level call in Marketplace._executeSale(Marketplace.Listing,address,uint256) (contracts/core/Marketplace.sol#316-367):
+	- (feeSuccess,None) = address(feeRecipient).call{value: platformAmount}() (contracts/core/Marketplace.sol#350-352)
+	- (royaltySuccess,None) = address(royaltyRecipient).call{value: royaltyAmount}() (contracts/core/Marketplace.sol#357-359)
+	- (sellerSuccess,None) = address(listing.seller).call{value: sellerAmount}() (contracts/core/Marketplace.sol#363-365)
+Low level call in NFTFactory.withdrawFees() (contracts/core/NFTFactory.sol#177-181):
+	- (success,None) = address(owner()).call{value: balance}() (contracts/core/NFTFactory.sol#179)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#low-level-calls
+INFO:Detectors:
+ShareToken.vault (contracts/advanced/FractionalVault.sol#164) should be immutable 
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#state-variables-that-could-be-declared-immutable
+INFO:Slither:. analyzed (71 contracts with 100 detectors), 72 result(s) found

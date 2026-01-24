@@ -1,112 +1,89 @@
-# 🎨 Advanced NFT Marketplace Platform
+# 🎨 NFT Marketplace
 
-> A production-grade, gas-optimized NFT marketplace supporting ERC-721 & ERC-1155 with advanced auction mechanisms, royalty enforcement, and cross-chain compatibility.
+> A Solidity-based NFT marketplace supporting ERC-721 & ERC-1155 with auctions, royalty enforcement, lazy minting, and fractional ownership.
 
-## 🌟 What Makes This Project Stand Out
+## ⚠️ Work In Progress
 
-### **Features**
-
-1. **Hybrid Bonding Curve Pricing** - Dynamic pricing algorithm for primary sales
-2. **Lazy Minting with Meta-Transactions** - Gas-free minting for creators
-3. **On-Chain Royalty Enforcement** - EIP-2981 with fallback mechanisms
-4. **Fractional Ownership (ERC-1155)** - Split NFT ownership among multiple holders
-5. **Cross-Chain Bridge Integration** - Move NFTs across different blockchains
-6. **Advanced Auction Types** - English, Dutch, Vickrey (sealed-bid), and Reserve auctions
-7. **Rarity Score Calculation** - On-chain trait-based rarity scoring
-8. **Upgradeable Smart Contracts** - UUPS proxy pattern for future improvements
-9. **Gasless Transactions** - EIP-2771 meta-transaction support
-10. **AI-Powered NFT Verification** - Detect plagiarism and verify authenticity
+This project is under active development. Some features are implemented, others are planned. See the feature matrix below.
 
 ---
 
-## 🏗️ Architecture Overview
+## ✅ Implemented Features
 
-### **Smart Contract Layer**
+### Core Contracts
+| Feature | Status | Contract |
+|---------|--------|----------|
+| ERC-721 token minting | ✅ Done | `ERC721NFT.sol`, `ERC721NFTInitializable.sol` |
+| ERC-1155 token minting | ✅ Done | `ERC1155NFT.sol`, `ERC1155NFTInitializable.sol` |
+| NFT Factory (clone pattern) | ✅ Done | `NFTFactory.sol` |
+| Marketplace (buy/sell/list) | ✅ Done | `Marketplace.sol` |
+| Offer system | ✅ Done | `Marketplace.sol` |
+| EIP-2981 royalties | ✅ Done | All token contracts |
+
+### Auction System
+| Feature | Status | Contract |
+|---------|--------|----------|
+| English auctions | ✅ Done | `AuctionEngine.sol` |
+| Dutch auctions | ✅ Done | `AuctionEngine.sol` |
+| Anti-sniping mechanism | ✅ Done | `AuctionEngine.sol` |
+| Reserve prices | ✅ Done | `AuctionEngine.sol` |
+
+### Advanced Features
+| Feature | Status | Contract |
+|---------|--------|----------|
+| Lazy minting (EIP-712) | ✅ Done | `LazyMinting.sol` |
+| Meta-transactions (EIP-712) | ✅ Done | `MetaTransactionHandler.sol` |
+| Fractional ownership | ✅ Done | `FractionalVault.sol` |
+
+### Security
+- ✅ Reentrancy guards (OpenZeppelin)
+- ✅ Access control (Ownable/AccessControl)
+- ✅ Pausable contracts
+- ✅ Custom errors for gas efficiency
+- ✅ Slither static analysis performed
+
+---
+
+## � Not Yet Implemented
+
+The following features are **planned but not yet built**:
+
+- ❌ Cross-chain bridge
+- ❌ Vickrey (sealed-bid) auctions
+- ❌ Bonding curve pricing
+- ❌ Rarity oracle
+- ❌ AI content verification
+- ❌ Frontend application
+- ❌ The Graph subgraph
+- ❌ Backend API
+
+---
+
+## 📁 Project Structure
 
 ```
-NFTMarketplace (Core)
-├── NFTFactory.sol          → Mint ERC-721/ERC-1155 tokens
-├── Marketplace.sol         → Buy/Sell/List NFTs
-├── AuctionEngine.sol       → Multiple auction mechanisms
-├── RoyaltyRegistry.sol     → Track and enforce royalties
-├── FractionalVault.sol     → Fractionalize high-value NFTs
-└── BridgeConnector.sol     → Cross-chain NFT transfers
+contracts/
+├── core/
+│   ├── Marketplace.sol      # Buy/sell/list NFTs, offers
+│   ├── NFTFactory.sol       # Clone-based collection deployment
+│   └── AuctionEngine.sol    # English & Dutch auctions
+├── advanced/
+│   ├── FractionalVault.sol  # Fractionalize NFTs into ERC-20 shares
+│   ├── LazyMinting.sol      # Gas-free minting with signatures
+│   └── MetaTransactionHandler.sol # Gasless meta-transactions
+├── tokens/
+│   ├── erc721/              # ERC-721 implementations
+│   └── erc1155/             # ERC-1155 implementations
+└── mocks/                   # Test helper contracts
+
+test/
+├── Marketplace.test.js
+├── AuctionEngine.test.js
+├── NFTFactory.test.js
+├── FractionalVault.test.js
+├── LazyMinting.test.js
+└── MetaTransactionHandler.test.js
 ```
-
-### **Technology Stack**
-
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **Blockchain** | Ethereum, Polygon, Base | Multi-chain deployment |
-| **Smart Contracts** | Solidity 0.8.20+ | Core business logic |
-| **Development** | Hardhat, Foundry | Testing & deployment |
-| **Frontend** | Next.js 14, TypeScript | Modern React framework |
-| **Web3 Integration** | Wagmi, Viem, RainbowKit | Wallet connectivity |
-| **Backend** | Node.js, Express | API & metadata server |
-| **Database** | PostgreSQL, Redis | Off-chain data & caching |
-| **Storage** | IPFS, Arweave | Decentralized file storage |
-| **Indexing** | The Graph | Blockchain data querying |
-
----
-
-## 📋 Core Features
-
-### ✅ **Must-Have Features (Industry Standard)**
-
-- [x] ERC-721 & ERC-1155 token support
-- [x] Buy, sell, and list NFTs
-- [x] English & Dutch auctions
-- [x] EIP-2981 royalty standard
-- [x] Wallet integration (MetaMask, WalletConnect)
-- [x] IPFS metadata storage
-- [x] Gas-optimized contracts
-- [x] Comprehensive test coverage (>90%)
-
-### 🚀 **Advanced Features (Differentiators)**
-
-- [x] **Lazy Minting** - Mint on first purchase to save gas
-- [x] **Meta-Transactions** - Gasless operations for users
-- [x] **Fractional Ownership** - Split expensive NFTs
-- [x] **Vickrey Auctions** - Sealed-bid second-price auctions
-- [x] **Bonding Curve Pricing** - Algorithmic pricing for collections
-- [x] **Cross-Chain Bridge** - Transfer NFTs between chains
-- [x] **Rarity Oracle** - On-chain rarity calculations
-- [x] **Upgradeable Contracts** - UUPS proxy pattern
-- [x] **Batch Operations** - Bulk minting/listing/buying
-- [x] **Offer System** - Make offers on unlisted NFTs
-
-### 🎯 **Innovative Features (Rarely Seen)**
-
-- [ ] **AI Content Verification** - Detect copied/plagiarized NFTs
-- [ ] **Dynamic NFTs** - Metadata changes based on conditions
-- [ ] **Social Trading** - Follow top collectors, copy trades
-- [ ] **NFT Lending/Borrowing** - Use NFTs as collateral
-- [ ] **Reputation System** - On-chain creator/collector scores
-- [ ] **Gasless Relayer Network** - Decentralized meta-tx relayers
-
----
-
-## 🔐 Security Considerations
-
-- ✅ Reentrancy guards on all state-changing functions
-- ✅ Access control with OpenZeppelin's AccessControl
-- ✅ Pausable contracts for emergency stops
-- ✅ Rate limiting on critical operations
-- ✅ Input validation and sanitization
-- ✅ Slither & Mythril static analysis
-- ✅ Comprehensive unit and integration tests
-
----
-
-## 📊 Gas Optimization Techniques
-
-1. **Storage Packing** - Optimize struct layouts
-2. **Unchecked Math** - Use unchecked blocks where safe
-3. **Calldata vs Memory** - Use calldata for read-only arrays
-4. **Short-Circuit Logic** - Order conditions efficiently
-5. **Bitmap Indexing** - Use bitmaps for boolean arrays
-6. **Custom Errors** - Replace require strings with custom errors
-7. **Batch Operations** - Reduce transaction count
 
 ---
 
@@ -117,21 +94,17 @@ NFTMarketplace (Core)
 ```bash
 node >= 18.0.0
 npm >= 9.0.0
-git >= 2.0.0
 ```
 
 ### Installation
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/nft-marketplace.git
-cd nft-marketplace
+git clone https://github.com/ayushns01/NFT-marketplace.git
+cd NFT-marketplace
 
 # Install dependencies
 npm install
-
-# Set up environment variables
-cp .env.example .env
 
 # Compile contracts
 npm run compile
@@ -139,50 +112,72 @@ npm run compile
 # Run tests
 npm run test
 
-# Deploy to testnet
+# Run with gas reporting
+npm run test:gas
+
+# Run coverage
+npm run coverage
+```
+
+### Deployment
+
+```bash
+# Deploy to Sepolia testnet
 npm run deploy:sepolia
-```
 
----
+# Deploy to Polygon
+npm run deploy:polygon
 
-## 📁 Project Structure
-
-```
-nft-marketplace/
-├── contracts/              # Smart contracts
-│   ├── core/              # Core marketplace logic
-│   ├── tokens/            # ERC-721/1155 implementations
-│   ├── auctions/          # Auction mechanisms
-│   ├── libraries/         # Reusable libraries
-│   └── interfaces/        # Contract interfaces
-├── test/                  # Contract tests
-├── scripts/               # Deployment scripts
-├── frontend/              # Next.js application
-│   ├── components/        # React components
-│   ├── hooks/            # Custom hooks
-│   ├── lib/              # Utilities
-│   └── pages/            # Next.js pages
-├── subgraph/             # The Graph indexing
-└── docs/                 # Documentation
-
+# Deploy locally
+npm run deploy:local
 ```
 
 ---
 
 ## 🧪 Testing
 
+The project includes comprehensive tests for all contracts:
+
 ```bash
 # Run all tests
 npm run test
 
-# Run with coverage
+# Run with coverage report
 npm run coverage
 
-# Run gas reporter
+# Run with gas reporting
 npm run test:gas
 
-# Run specific test file
-npx hardhat test test/Marketplace.test.ts
+# Run specific test
+npx hardhat test test/FractionalVault.test.js
 ```
 
 ---
+
+## 📊 Gas Optimization Techniques Used
+
+1. **Custom Errors** - Gas-efficient error handling
+2. **Calldata** - Used for read-only parameters
+3. **Storage Packing** - Optimized struct layouts
+4. **Unchecked Math** - Where overflow is impossible
+5. **Clone Pattern** - Minimal proxy for NFT collections
+
+---
+
+## 🔒 Security Notes
+
+- All contracts use OpenZeppelin's security primitives
+- Static analysis performed with Slither
+- Locked Solidity version (0.8.20)
+- CEI pattern followed in state changes
+
+### Known Considerations
+
+- `block.timestamp` used for auction timing (acceptable for ~15s precision)
+- Meta-transactions require trusted relayer setup
+
+---
+
+## 📜 License
+
+MIT

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
@@ -74,6 +74,9 @@ contract AuctionEngine is
         uint256 amount
     );
     event AuctionCancelled(uint256 indexed auctionId);
+    event PlatformFeeUpdated(uint256 newFee);
+    event AntiSnipingDurationUpdated(uint256 newDuration);
+    event MinBidIncrementUpdated(uint256 newBps);
 
     error AuctionNotActive();
     error AuctionStillActive();
@@ -422,6 +425,7 @@ contract AuctionEngine is
     function setPlatformFee(uint256 newFee) external onlyOwner {
         if (newFee > 1000) revert FeeTooHigh();
         platformFee = newFee;
+        emit PlatformFeeUpdated(newFee);
     }
 
     function setFeeRecipient(address newRecipient) external onlyOwner {
@@ -431,10 +435,12 @@ contract AuctionEngine is
 
     function setAntiSnipingDuration(uint256 duration) external onlyOwner {
         antiSnipingDuration = duration;
+        emit AntiSnipingDurationUpdated(duration);
     }
 
     function setMinBidIncrement(uint256 bps) external onlyOwner {
         minBidIncrementBps = bps;
+        emit MinBidIncrementUpdated(bps);
     }
 
     function pause() external onlyOwner {

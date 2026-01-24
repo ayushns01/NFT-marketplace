@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -20,6 +20,7 @@ contract FractionalVault is ReentrancyGuard {
         address shareToken;
         uint256 totalShares;
         uint256 reservePrice;
+        uint256 buyoutPrice;      // NEW: Store actual buyout amount for pro-rata claims
         VaultState state;
         uint256 createdAt;
     }
@@ -27,6 +28,7 @@ contract FractionalVault is ReentrancyGuard {
     uint256 private _vaultIdCounter;
     mapping(uint256 => Vault) public vaults;
     mapping(address => uint256) public nftToVault;
+    mapping(uint256 => uint256) public claimedShares; // NEW: Track claimed shares per vault
 
     event VaultCreated(
         uint256 indexed vaultId,
@@ -44,14 +46,22 @@ contract FractionalVault is ReentrancyGuard {
     );
     event VaultRedeemed(uint256 indexed vaultId, address indexed redeemer);
     event ReservePriceUpdated(uint256 indexed vaultId, uint256 newPrice);
+    event ProceedsClaimed(         // NEW: Event for transparency
+        uint256 indexed vaultId,
+        address indexed shareholder,
+        uint256 shares,
+        uint256 amount
+    );
 
     error VaultNotActive();
+    error VaultNotBought();        // NEW: For claimProceeds
     error InsufficientPayment();
     error NotCurator();
     error NFTAlreadyVaulted();
     error InvalidShares();
     error TransferFailed();
     error NotAllSharesOwned();
+    error NothingToClaim();        // NEW: For claimProceeds
 
     function fractionalize(
         address nftContract,
@@ -82,6 +92,7 @@ contract FractionalVault is ReentrancyGuard {
             shareToken: address(shareToken),
             totalShares: totalShares,
             reservePrice: reservePrice,
+            buyoutPrice: 0,        // NEW: Initialize to 0
             state: VaultState.Active,
             createdAt: block.timestamp
         });
@@ -107,6 +118,7 @@ contract FractionalVault is ReentrancyGuard {
         if (msg.value < vault.reservePrice) revert InsufficientPayment();
 
         vault.state = VaultState.Bought;
+        vault.buyoutPrice = msg.value;  // NEW: Store buyout amount for claims
 
         IERC721(vault.nftContract).transferFrom(
             address(this),
@@ -115,6 +127,33 @@ contract FractionalVault is ReentrancyGuard {
         );
 
         emit BuyoutInitiated(vaultId, msg.sender, msg.value);
+    }
+
+    /// @notice Claim pro-rata share of buyout proceeds
+    /// @param vaultId The vault ID to claim from
+    /// @dev Burns caller's share tokens and transfers proportional ETH
+    function claimProceeds(uint256 vaultId) external nonReentrant {
+        Vault storage vault = vaults[vaultId];
+
+        if (vault.state != VaultState.Bought) revert VaultNotBought();
+
+        ShareToken shareToken = ShareToken(vault.shareToken);
+        uint256 userShares = shareToken.balanceOf(msg.sender);
+
+        if (userShares == 0) revert NothingToClaim();
+
+        // Calculate pro-rata payment
+        uint256 payment = (userShares * vault.buyoutPrice) / vault.totalShares;
+
+        // Burn shares before transfer (CEI pattern)
+        shareToken.burnFrom(msg.sender, userShares);
+        claimedShares[vaultId] += userShares;
+
+        // Transfer ETH
+        (bool success, ) = payable(msg.sender).call{value: payment}("");
+        if (!success) revert TransferFailed();
+
+        emit ProceedsClaimed(vaultId, msg.sender, userShares, payment);
     }
 
     function redeem(uint256 vaultId) external nonReentrant {
@@ -158,19 +197,33 @@ contract FractionalVault is ReentrancyGuard {
     function getTotalVaults() external view returns (uint256) {
         return _vaultIdCounter;
     }
+
+    /// @notice Get claimable amount for a shareholder
+    /// @param vaultId The vault ID
+    /// @param shareholder The address to check
+    /// @return The amount of ETH claimable
+    function getClaimableAmount(uint256 vaultId, address shareholder) external view returns (uint256) {
+        Vault storage vault = vaults[vaultId];
+        if (vault.state != VaultState.Bought) return 0;
+        
+        ShareToken shareToken = ShareToken(vault.shareToken);
+        uint256 userShares = shareToken.balanceOf(shareholder);
+        
+        return (userShares * vault.buyoutPrice) / vault.totalShares;
+    }
 }
 
 contract ShareToken is ERC20 {
-    address public vault;
+    address public immutable vault;  // FIXED: Made immutable per Slither
 
     constructor(
-        string memory name,
-        string memory symbol,
-        uint256 totalSupply,
+        string memory name_,
+        string memory symbol_,
+        uint256 totalSupply_,
         address recipient
-    ) ERC20(name, symbol) {
+    ) ERC20(name_, symbol_) {
         vault = msg.sender;
-        _mint(recipient, totalSupply);
+        _mint(recipient, totalSupply_);
     }
 
     function burnFrom(address account, uint256 amount) external {
