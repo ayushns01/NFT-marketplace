@@ -241,26 +241,27 @@ describe("AuctionEngine", function () {
             expect(await auctionEngine.pendingReturns(bidder1.address)).to.equal(ethers.parseEther("1"));
         });
 
-        it("Should distribute fees correctly", async function () {
+        it("Should distribute fees correctly (Pull Pattern)", async function () {
             await auctionEngine.connect(bidder1).placeBid(0, { value: ethers.parseEther("1") });
 
             const bid = ethers.parseEther("1");
             const platformAmount = (bid * BigInt(PLATFORM_FEE)) / 10000n;
+            const royaltyAmount = (bid * BigInt(ROYALTY_FEE)) / 10000n;
+            const sellerProceeds = bid - platformAmount - royaltyAmount;
 
-            const sellerBalanceBefore = await ethers.provider.getBalance(seller.address);
             const ownerBalanceBefore = await ethers.provider.getBalance(owner.address);
 
             await time.increase(ONE_DAY + 1);
             await auctionEngine.endAuction(0);
 
-            const sellerBalanceAfter = await ethers.provider.getBalance(seller.address);
             const ownerBalanceAfter = await ethers.provider.getBalance(owner.address);
 
-            // Owner gets platform fee
+            // Owner gets platform fee (direct)
             expect(ownerBalanceAfter - ownerBalanceBefore).to.be.closeTo(platformAmount, ethers.parseEther("0.001"));
 
-            // Seller gets remaining after fees
-            expect(sellerBalanceAfter).to.be.gt(sellerBalanceBefore);
+            // Seller and Royalty are pull
+            expect(await auctionEngine.pendingReturns(seller.address)).to.equal(sellerProceeds);
+            expect(await auctionEngine.pendingReturns(royaltyReceiver.address)).to.equal(royaltyAmount);
         });
 
         it("Should fail to end before time", async function () {

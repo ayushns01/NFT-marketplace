@@ -55,8 +55,8 @@ contract AuctionEngine is
     uint256 public minBidIncrementBps;
 
     mapping(uint256 => Auction) public auctions;
-    mapping(address => uint256) public pendingReturns;
-    mapping(address => uint256) public lastInteractionBlock; // Flash loan protection
+    mapping(address => uint256) public pendingReturns; // Outbid refunds and seller proceeds
+    mapping(uint256 => uint256) public auctionCreatedBlock; // Auction-level flash loan protection
 
     event AuctionCreated(
         uint256 indexed auctionId,
@@ -78,6 +78,7 @@ contract AuctionEngine is
     event PlatformFeeUpdated(uint256 newFee);
     event AntiSnipingDurationUpdated(uint256 newDuration);
     event MinBidIncrementUpdated(uint256 newBps);
+    event FundsWithdrawn(address indexed recipient, uint256 amount);
 
     error AuctionNotActive();
     error AuctionStillActive();
@@ -92,13 +93,12 @@ contract AuctionEngine is
     error HasBids();
     error InvalidParams();
     error FeeTooHigh();
-    error FlashLoanBlocked();
+    error SameBlockBid();
 
-    /// @notice Prevents same-block interactions to resist flash loan attacks
-    modifier noFlashLoan() {
-        if (block.number == lastInteractionBlock[msg.sender])
-            revert FlashLoanBlocked();
-        lastInteractionBlock[msg.sender] = block.number;
+    /// @notice Prevents same-block bidding on newly created auctions
+    modifier noSameBlockBid(uint256 auctionId) {
+        if (block.number == auctionCreatedBlock[auctionId])
+            revert SameBlockBid();
         _;
     }
 
@@ -147,6 +147,8 @@ contract AuctionEngine is
             highestBid: 0
         });
 
+        auctionCreatedBlock[auctionId] = block.number;
+
         emit AuctionCreated(auctionId, msg.sender, AuctionType.English);
         return auctionId;
     }
@@ -185,6 +187,8 @@ contract AuctionEngine is
             highestBidder: address(0),
             highestBid: 0
         });
+
+        auctionCreatedBlock[auctionId] = block.number;
 
         emit AuctionCreated(auctionId, msg.sender, AuctionType.Dutch);
         return auctionId;
@@ -228,13 +232,15 @@ contract AuctionEngine is
             highestBid: 0
         });
 
+        auctionCreatedBlock[auctionId] = block.number;
+
         emit AuctionCreated(auctionId, msg.sender, AuctionType.English);
         return auctionId;
     }
 
     function placeBid(
         uint256 auctionId
-    ) external payable whenNotPaused nonReentrant {
+    ) external payable whenNotPaused nonReentrant noSameBlockBid(auctionId) {
         Auction storage auction = auctions[auctionId];
 
         if (auction.status != AuctionStatus.Active) revert AuctionNotActive();
@@ -363,6 +369,8 @@ contract AuctionEngine is
         pendingReturns[msg.sender] = 0;
         (bool success, ) = payable(msg.sender).call{value: amount}("");
         if (!success) revert TransferFailed();
+
+        emit FundsWithdrawn(msg.sender, amount);
     }
 
     function _transferNFT(Auction storage auction, address to) internal {
@@ -399,22 +407,20 @@ contract AuctionEngine is
         } catch {}
         uint256 sellerAmount = price - platformAmount - royaltyAmount;
 
+        // Platform fee: direct transfer (trusted recipient)
         if (platformAmount > 0) {
             (bool feeSuccess, ) = payable(feeRecipient).call{
                 value: platformAmount
             }("");
             if (!feeSuccess) revert TransferFailed();
         }
+
+        // Royalty and seller: pull-pattern to prevent DoS
         if (royaltyAmount > 0 && royaltyRecipient != address(0)) {
-            (bool royaltySuccess, ) = payable(royaltyRecipient).call{
-                value: royaltyAmount
-            }("");
-            if (!royaltySuccess) revert TransferFailed();
+            pendingReturns[royaltyRecipient] += royaltyAmount;
         }
-        (bool sellerSuccess, ) = payable(auction.seller).call{
-            value: sellerAmount
-        }("");
-        if (!sellerSuccess) revert TransferFailed();
+
+        pendingReturns[auction.seller] += sellerAmount;
     }
 
     function getAuction(
