@@ -330,7 +330,7 @@ contract Marketplace is
     ) internal {
         uint256 platformAmount = (price * platformFee) / 10000;
         uint256 royaltyAmount = 0;
-        address royaltyRecipient;
+        address royaltyRecipient = address(0);
 
         try
             IERC2981(listing.nftContract).royaltyInfo(listing.tokenId, price)

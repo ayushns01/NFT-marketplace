@@ -49,6 +49,7 @@ contract LazyMinting is EIP712, Ownable, ReentrancyGuard, Pausable {
     error InvalidPrice();
     error TransferFailed();
     error ZeroAddress();
+    error FeeTooHigh();
 
     constructor(
         uint256 _platformFee,
@@ -156,7 +157,7 @@ contract LazyMinting is EIP712, Ownable, ReentrancyGuard, Pausable {
     }
 
     function setPlatformFee(uint256 newFee) external onlyOwner {
-        require(newFee <= 1000, "Fee too high");
+        if (newFee > 1000) revert FeeTooHigh();
         platformFee = newFee;
         emit PlatformFeeUpdated(newFee);
     }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity ^0.8.22;
 
 // Use standard interfaces (OZ v5 compatible)
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";

@@ -94,6 +94,7 @@ contract VickreyAuction is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
     error NothingToWithdraw();
     error TransferFailed();
     error ZeroAddress();
+    error FeeTooHigh();
 
     constructor(
         uint256 _platformFee,
@@ -340,7 +341,7 @@ contract VickreyAuction is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
 
     // Admin functions
     function setPlatformFee(uint256 newFee) external onlyOwner {
-        require(newFee <= 1000, "Fee too high"); // Max 10%
+        if (newFee > 1000) revert FeeTooHigh();
         platformFee = newFee;
     }
 

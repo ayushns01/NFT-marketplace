@@ -81,6 +81,7 @@ contract BondingCurve is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
     error TransferFailed();
     error InvalidParams();
     error ZeroAddress();
+    error FeeTooHigh();
 
     constructor(
         uint256 _platformFee,
@@ -286,7 +287,7 @@ contract BondingCurve is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
 
     // Admin functions
     function setPlatformFee(uint256 newFee) external onlyOwner {
-        require(newFee <= 1000, "Fee too high");
+        if (newFee > 1000) revert FeeTooHigh();
         platformFee = newFee;
     }
 

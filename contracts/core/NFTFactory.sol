@@ -62,7 +62,7 @@ contract NFTFactory is Ownable {
         if (msg.value < creationFee) revert InsufficientFee();
 
         bytes32 salt = keccak256(
-            abi.encodePacked(msg.sender, name, symbol, block.timestamp)
+            abi.encode(msg.sender, name, symbol, block.timestamp)
         );
 
         address clone = erc721Implementation.cloneDeterministic(salt);
@@ -95,7 +95,7 @@ contract NFTFactory is Ownable {
         if (msg.value < creationFee) revert InsufficientFee();
 
         bytes32 salt = keccak256(
-            abi.encodePacked(msg.sender, name, symbol, block.timestamp)
+            abi.encode(msg.sender, name, symbol, block.timestamp)
         );
 
         address clone = erc1155Implementation.cloneDeterministic(salt);
@@ -124,9 +124,7 @@ contract NFTFactory is Ownable {
         string calldata symbol,
         uint256 timestamp
     ) external view returns (address) {
-        bytes32 salt = keccak256(
-            abi.encodePacked(creator, name, symbol, timestamp)
-        );
+        bytes32 salt = keccak256(abi.encode(creator, name, symbol, timestamp));
         return erc721Implementation.predictDeterministicAddress(salt);
     }
 
@@ -136,9 +134,7 @@ contract NFTFactory is Ownable {
         string calldata symbol,
         uint256 timestamp
     ) external view returns (address) {
-        bytes32 salt = keccak256(
-            abi.encodePacked(creator, name, symbol, timestamp)
-        );
+        bytes32 salt = keccak256(abi.encode(creator, name, symbol, timestamp));
         return erc1155Implementation.predictDeterministicAddress(salt);
     }
 

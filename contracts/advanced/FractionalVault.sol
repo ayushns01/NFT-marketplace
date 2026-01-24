@@ -20,7 +20,7 @@ contract FractionalVault is ReentrancyGuard {
         address shareToken;
         uint256 totalShares;
         uint256 reservePrice;
-        uint256 buyoutPrice;      // NEW: Store actual buyout amount for pro-rata claims
+        uint256 buyoutPrice; // NEW: Store actual buyout amount for pro-rata claims
         VaultState state;
         uint256 createdAt;
     }
@@ -46,22 +46,29 @@ contract FractionalVault is ReentrancyGuard {
     );
     event VaultRedeemed(uint256 indexed vaultId, address indexed redeemer);
     event ReservePriceUpdated(uint256 indexed vaultId, uint256 newPrice);
-    event ProceedsClaimed(         // NEW: Event for transparency
+    event ProceedsClaimed(// NEW: Event for transparency
+
+
         uint256 indexed vaultId,
         address indexed shareholder,
         uint256 shares,
         uint256 amount
     );
+    event DustWithdrawn(
+        uint256 indexed vaultId,
+        address indexed curator,
+        uint256 amount
+    );
 
     error VaultNotActive();
-    error VaultNotBought();        // NEW: For claimProceeds
+    error VaultNotBought(); // NEW: For claimProceeds
     error InsufficientPayment();
     error NotCurator();
     error NFTAlreadyVaulted();
     error InvalidShares();
     error TransferFailed();
     error NotAllSharesOwned();
-    error NothingToClaim();        // NEW: For claimProceeds
+    error NothingToClaim(); // NEW: For claimProceeds
 
     function fractionalize(
         address nftContract,
@@ -92,7 +99,7 @@ contract FractionalVault is ReentrancyGuard {
             shareToken: address(shareToken),
             totalShares: totalShares,
             reservePrice: reservePrice,
-            buyoutPrice: 0,        // NEW: Initialize to 0
+            buyoutPrice: 0, // NEW: Initialize to 0
             state: VaultState.Active,
             createdAt: block.timestamp
         });
@@ -118,7 +125,7 @@ contract FractionalVault is ReentrancyGuard {
         if (msg.value < vault.reservePrice) revert InsufficientPayment();
 
         vault.state = VaultState.Bought;
-        vault.buyoutPrice = msg.value;  // NEW: Store buyout amount for claims
+        vault.buyoutPrice = msg.value; // NEW: Store buyout amount for claims
 
         IERC721(vault.nftContract).transferFrom(
             address(this),
@@ -202,19 +209,42 @@ contract FractionalVault is ReentrancyGuard {
     /// @param vaultId The vault ID
     /// @param shareholder The address to check
     /// @return The amount of ETH claimable
-    function getClaimableAmount(uint256 vaultId, address shareholder) external view returns (uint256) {
+    function getClaimableAmount(
+        uint256 vaultId,
+        address shareholder
+    ) external view returns (uint256) {
         Vault storage vault = vaults[vaultId];
         if (vault.state != VaultState.Bought) return 0;
-        
+
         ShareToken shareToken = ShareToken(vault.shareToken);
         uint256 userShares = shareToken.balanceOf(shareholder);
-        
+
         return (userShares * vault.buyoutPrice) / vault.totalShares;
+    }
+
+    /// @notice Withdraw rounding dust after all shares have been claimed
+    /// @param vaultId The vault ID
+    /// @dev Only callable by curator after all shares are claimed
+    function withdrawDust(uint256 vaultId) external nonReentrant {
+        Vault storage vault = vaults[vaultId];
+        if (msg.sender != vault.curator) revert NotCurator();
+        if (vault.state != VaultState.Bought) revert VaultNotBought();
+
+        ShareToken shareToken = ShareToken(vault.shareToken);
+        if (shareToken.totalSupply() != 0) revert NothingToClaim();
+
+        uint256 dust = address(this).balance;
+        if (dust == 0) revert NothingToClaim();
+
+        (bool success, ) = payable(msg.sender).call{value: dust}("");
+        if (!success) revert TransferFailed();
+
+        emit DustWithdrawn(vaultId, msg.sender, dust);
     }
 }
 
 contract ShareToken is ERC20 {
-    address public immutable vault;  // FIXED: Made immutable per Slither
+    address public immutable vault; // FIXED: Made immutable per Slither
 
     constructor(
         string memory name_,
