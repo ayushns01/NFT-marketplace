@@ -54,7 +54,8 @@ contract Marketplace is
     mapping(address => uint256[]) public userListings;
     mapping(address => mapping(address => mapping(uint256 => uint256)))
         public activeListingId;
-    mapping(address => uint256) public lastInteractionBlock; // Flash loan protection
+    mapping(uint256 => uint256) public listingCreatedBlock; // Listing-level flash loan protection
+    mapping(address => uint256) public pendingWithdrawals; // Pull-pattern for payments
 
     event Listed(
         uint256 indexed listingId,
@@ -89,6 +90,7 @@ contract Marketplace is
     event OfferCancelled(uint256 indexed listingId, uint256 offerIndex);
     event PlatformFeeUpdated(uint256 newFee);
     event FeeRecipientUpdated(address newRecipient);
+    event FundsWithdrawn(address indexed recipient, uint256 amount);
 
     error InvalidPrice();
     error InvalidAmount();
@@ -103,13 +105,13 @@ contract Marketplace is
     error NotTokenOwner();
     error ZeroAddress();
     error FeeTooHigh();
-    error FlashLoanBlocked();
+    error SameBlockPurchase();
+    error NothingToWithdraw();
 
-    /// @notice Prevents same-block interactions to resist flash loan attacks
-    modifier noFlashLoan() {
-        if (block.number == lastInteractionBlock[msg.sender])
-            revert FlashLoanBlocked();
-        lastInteractionBlock[msg.sender] = block.number;
+    /// @notice Prevents same-block purchase of newly created listings to resist flash loan attacks
+    modifier noSameBlockPurchase(uint256 listingId) {
+        if (block.number == listingCreatedBlock[listingId])
+            revert SameBlockPurchase();
         _;
     }
 
@@ -125,7 +127,7 @@ contract Marketplace is
         address nftContract,
         uint256 tokenId,
         uint256 price
-    ) external whenNotPaused nonReentrant noFlashLoan returns (uint256) {
+    ) external whenNotPaused nonReentrant returns (uint256) {
         if (price == 0) revert InvalidPrice();
         if (nftContract == address(0)) revert ZeroAddress();
 
@@ -147,6 +149,7 @@ contract Marketplace is
             createdAt: block.timestamp
         });
 
+        listingCreatedBlock[listingId] = block.number;
         userListings[msg.sender].push(listingId);
         activeListingId[msg.sender][nftContract][tokenId] = listingId;
 
@@ -168,7 +171,7 @@ contract Marketplace is
         uint256 tokenId,
         uint256 amount,
         uint256 price
-    ) external whenNotPaused nonReentrant noFlashLoan returns (uint256) {
+    ) external whenNotPaused nonReentrant returns (uint256) {
         if (price == 0) revert InvalidPrice();
         if (amount == 0) revert InvalidAmount();
         if (nftContract == address(0)) revert ZeroAddress();
@@ -190,6 +193,7 @@ contract Marketplace is
             createdAt: block.timestamp
         });
 
+        listingCreatedBlock[listingId] = block.number;
         userListings[msg.sender].push(listingId);
         activeListingId[msg.sender][nftContract][tokenId] = listingId;
 
@@ -208,7 +212,13 @@ contract Marketplace is
 
     function buy(
         uint256 listingId
-    ) external payable whenNotPaused nonReentrant noFlashLoan {
+    )
+        external
+        payable
+        whenNotPaused
+        nonReentrant
+        noSameBlockPurchase(listingId)
+    {
         Listing storage listing = listings[listingId];
 
         if (listing.status != ListingStatus.Active) revert ListingNotActive();
@@ -356,6 +366,7 @@ contract Marketplace is
             );
         }
 
+        // Platform fee: direct transfer (trusted recipient)
         if (platformAmount > 0) {
             (bool feeSuccess, ) = payable(feeRecipient).call{
                 value: platformAmount
@@ -363,17 +374,25 @@ contract Marketplace is
             if (!feeSuccess) revert TransferFailed();
         }
 
+        // Royalty and seller: pull-pattern to prevent DoS
         if (royaltyAmount > 0 && royaltyRecipient != address(0)) {
-            (bool royaltySuccess, ) = payable(royaltyRecipient).call{
-                value: royaltyAmount
-            }("");
-            if (!royaltySuccess) revert TransferFailed();
+            pendingWithdrawals[royaltyRecipient] += royaltyAmount;
         }
 
-        (bool sellerSuccess, ) = payable(listing.seller).call{
-            value: sellerAmount
-        }("");
-        if (!sellerSuccess) revert TransferFailed();
+        pendingWithdrawals[listing.seller] += sellerAmount;
+    }
+
+    /// @notice Withdraw accumulated funds from sales and royalties
+    function withdrawFunds() external nonReentrant {
+        uint256 amount = pendingWithdrawals[msg.sender];
+        if (amount == 0) revert NothingToWithdraw();
+
+        pendingWithdrawals[msg.sender] = 0;
+
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        if (!success) revert TransferFailed();
+
+        emit FundsWithdrawn(msg.sender, amount);
     }
 
     function getListing(

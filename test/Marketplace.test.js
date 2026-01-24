@@ -159,25 +159,24 @@ describe("Marketplace", function () {
             expect(listing.status).to.equal(1); // Sold
         });
 
-        it("Should distribute fees correctly", async function () {
+        it("Should distribute fees correctly (Pull Pattern)", async function () {
             const price = ethers.parseEther("1");
             const platformAmount = (price * BigInt(PLATFORM_FEE)) / 10000n;
             const royaltyAmount = (price * BigInt(ROYALTY_FEE)) / 10000n;
             const sellerAmount = price - platformAmount - royaltyAmount;
 
-            const sellerBalanceBefore = await ethers.provider.getBalance(seller.address);
             const ownerBalanceBefore = await ethers.provider.getBalance(owner.address);
-            const royaltyBalanceBefore = await ethers.provider.getBalance(royaltyReceiver.address);
 
             await marketplace.connect(buyer).buy(0, { value: price });
 
-            const sellerBalanceAfter = await ethers.provider.getBalance(seller.address);
             const ownerBalanceAfter = await ethers.provider.getBalance(owner.address);
-            const royaltyBalanceAfter = await ethers.provider.getBalance(royaltyReceiver.address);
 
-            expect(sellerBalanceAfter - sellerBalanceBefore).to.equal(sellerAmount);
+            // Platform fee is direct transfer
             expect(ownerBalanceAfter - ownerBalanceBefore).to.equal(platformAmount);
-            expect(royaltyBalanceAfter - royaltyBalanceBefore).to.equal(royaltyAmount);
+
+            // Seller and Royalty are pull payments
+            expect(await marketplace.pendingWithdrawals(seller.address)).to.equal(sellerAmount);
+            expect(await marketplace.pendingWithdrawals(royaltyReceiver.address)).to.equal(royaltyAmount);
         });
 
         it("Should fail with insufficient payment", async function () {
