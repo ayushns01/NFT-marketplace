@@ -56,6 +56,7 @@ contract AuctionEngine is
 
     mapping(uint256 => Auction) public auctions;
     mapping(address => uint256) public pendingReturns;
+    mapping(address => uint256) public lastInteractionBlock; // Flash loan protection
 
     event AuctionCreated(
         uint256 indexed auctionId,
@@ -91,6 +92,15 @@ contract AuctionEngine is
     error HasBids();
     error InvalidParams();
     error FeeTooHigh();
+    error FlashLoanBlocked();
+
+    /// @notice Prevents same-block interactions to resist flash loan attacks
+    modifier noFlashLoan() {
+        if (block.number == lastInteractionBlock[msg.sender])
+            revert FlashLoanBlocked();
+        lastInteractionBlock[msg.sender] = block.number;
+        _;
+    }
 
     constructor(
         uint256 _platformFee,
