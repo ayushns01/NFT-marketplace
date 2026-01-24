@@ -54,6 +54,7 @@ contract Marketplace is
     mapping(address => uint256[]) public userListings;
     mapping(address => mapping(address => mapping(uint256 => uint256)))
         public activeListingId;
+    mapping(address => uint256) public lastInteractionBlock; // Flash loan protection
 
     event Listed(
         uint256 indexed listingId,
@@ -102,6 +103,15 @@ contract Marketplace is
     error NotTokenOwner();
     error ZeroAddress();
     error FeeTooHigh();
+    error FlashLoanBlocked();
+
+    /// @notice Prevents same-block interactions to resist flash loan attacks
+    modifier noFlashLoan() {
+        if (block.number == lastInteractionBlock[msg.sender])
+            revert FlashLoanBlocked();
+        lastInteractionBlock[msg.sender] = block.number;
+        _;
+    }
 
     constructor(
         uint256 _platformFee,
@@ -115,7 +125,7 @@ contract Marketplace is
         address nftContract,
         uint256 tokenId,
         uint256 price
-    ) external whenNotPaused nonReentrant returns (uint256) {
+    ) external whenNotPaused nonReentrant noFlashLoan returns (uint256) {
         if (price == 0) revert InvalidPrice();
         if (nftContract == address(0)) revert ZeroAddress();
 
@@ -158,7 +168,7 @@ contract Marketplace is
         uint256 tokenId,
         uint256 amount,
         uint256 price
-    ) external whenNotPaused nonReentrant returns (uint256) {
+    ) external whenNotPaused nonReentrant noFlashLoan returns (uint256) {
         if (price == 0) revert InvalidPrice();
         if (amount == 0) revert InvalidAmount();
         if (nftContract == address(0)) revert ZeroAddress();
@@ -198,7 +208,7 @@ contract Marketplace is
 
     function buy(
         uint256 listingId
-    ) external payable whenNotPaused nonReentrant {
+    ) external payable whenNotPaused nonReentrant noFlashLoan {
         Listing storage listing = listings[listingId];
 
         if (listing.status != ListingStatus.Active) revert ListingNotActive();
