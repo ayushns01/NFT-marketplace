@@ -97,7 +97,7 @@ describe("MarketplaceV2", function () {
         });
 
         it("Should return correct version", async function () {
-            expect(await marketplaceV2.version()).to.equal("2.0.0");
+            expect(await marketplaceV2.version()).to.equal("2.1.0");
         });
 
         it("Should start with zero listings", async function () {
@@ -215,25 +215,24 @@ describe("MarketplaceV2", function () {
             expect(await erc721.ownerOf(0)).to.equal(buyer.address);
         });
 
-        it("Should distribute fees correctly", async function () {
+        it("Should distribute fees correctly (Pull Pattern)", async function () {
             const price = ethers.parseEther("1");
             const platformAmount = (price * BigInt(PLATFORM_FEE)) / 10000n;
             const royaltyAmount = (price * BigInt(ROYALTY_FEE)) / 10000n;
             const sellerAmount = price - platformAmount - royaltyAmount;
 
-            const sellerBalanceBefore = await ethers.provider.getBalance(seller.address);
             const ownerBalanceBefore = await ethers.provider.getBalance(owner.address);
-            const royaltyBalanceBefore = await ethers.provider.getBalance(royaltyReceiver.address);
 
             await marketplaceV2.connect(buyer).buy(0, { value: price });
 
-            const sellerBalanceAfter = await ethers.provider.getBalance(seller.address);
             const ownerBalanceAfter = await ethers.provider.getBalance(owner.address);
-            const royaltyBalanceAfter = await ethers.provider.getBalance(royaltyReceiver.address);
 
-            expect(sellerBalanceAfter - sellerBalanceBefore).to.equal(sellerAmount);
+            // Platform fee is direct transfer
             expect(ownerBalanceAfter - ownerBalanceBefore).to.equal(platformAmount);
-            expect(royaltyBalanceAfter - royaltyBalanceBefore).to.equal(royaltyAmount);
+
+            // Seller and Royalty are pull payments
+            expect(await marketplaceV2.pendingWithdrawals(seller.address)).to.equal(sellerAmount);
+            expect(await marketplaceV2.pendingWithdrawals(royaltyReceiver.address)).to.equal(royaltyAmount);
         });
 
         it("Should refund excess payment", async function () {
@@ -294,19 +293,7 @@ describe("MarketplaceV2", function () {
         });
     });
 
-    describe("Flash Loan Protection", function () {
-        it("Should block same-block interactions", async function () {
-            // This test is tricky to execute in Hardhat since each tx is in its own block
-            // We verify the modifier exists and works by checking state changes
-            await marketplaceV2.connect(seller).listERC721(
-                await erc721.getAddress(), 0, ethers.parseEther("1"), ethers.ZeroAddress
-            );
 
-            // The lastInteractionBlock should be updated
-            const lastBlock = await marketplaceV2.lastInteractionBlock(seller.address);
-            expect(lastBlock).to.be.gt(0);
-        });
-    });
 
     describe("Cancel and Update Listing", function () {
         beforeEach(async function () {

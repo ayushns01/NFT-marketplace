@@ -91,8 +91,13 @@ contract MarketplaceV2 is
     mapping(address => uint256[]) public userListings;
     mapping(address => mapping(address => mapping(uint256 => uint256)))
         public activeListingId;
-    mapping(address => uint256) public lastInteractionBlock;
+    mapping(uint256 => uint256) public listingCreatedBlock; // Listing-level flash loan protection
+    mapping(address => uint256) public pendingWithdrawals; // Pull-pattern for payments
     mapping(address => bool) public acceptedTokens; // Whitelisted ERC20s
+    mapping(address => uint256) public scheduledUpgrades; // Timelock: impl => executable timestamp
+
+    // ============ Constants ============
+    uint256 public constant UPGRADE_DELAY = 2 days;
 
     // ============ Events ============
     event Listed(
@@ -129,6 +134,12 @@ contract MarketplaceV2 is
     event PlatformFeeUpdated(uint256 oldFee, uint256 newFee);
     event FeeRecipientUpdated(address oldRecipient, address newRecipient);
     event TokenWhitelisted(address indexed token, bool status);
+    event FundsWithdrawn(address indexed recipient, uint256 amount);
+    event UpgradeScheduled(
+        address indexed newImplementation,
+        uint256 executableAt
+    );
+    event UpgradeCancelled(address indexed newImplementation);
 
     // ============ Errors ============
     error InvalidPrice();
@@ -144,15 +155,17 @@ contract MarketplaceV2 is
     error NotTokenOwner();
     error ZeroAddress();
     error FeeTooHigh();
-    error FlashLoanBlocked();
+    error SameBlockPurchase();
+    error NothingToWithdraw();
+    error UpgradeNotScheduled();
+    error UpgradeTooEarly();
     error TokenNotAccepted();
     error PaymentMethodMismatch();
 
     // ============ Modifiers ============
-    modifier noFlashLoan() {
-        if (block.number == lastInteractionBlock[msg.sender])
-            revert FlashLoanBlocked();
-        lastInteractionBlock[msg.sender] = block.number;
+    modifier noSameBlockPurchase(uint256 listingId) {
+        if (block.number == listingCreatedBlock[listingId])
+            revert SameBlockPurchase();
         _;
     }
 
@@ -195,7 +208,7 @@ contract MarketplaceV2 is
         uint256 tokenId,
         uint256 price,
         address paymentToken
-    ) external whenNotPaused nonReentrant noFlashLoan returns (uint256) {
+    ) external whenNotPaused nonReentrant returns (uint256) {
         if (price == 0) revert InvalidPrice();
         if (nftContract == address(0)) revert ZeroAddress();
         if (paymentToken != address(0) && !acceptedTokens[paymentToken])
@@ -220,6 +233,7 @@ contract MarketplaceV2 is
             createdAt: block.timestamp
         });
 
+        listingCreatedBlock[listingId] = block.number;
         userListings[msg.sender].push(listingId);
         activeListingId[msg.sender][nftContract][tokenId] = listingId;
 
@@ -242,7 +256,7 @@ contract MarketplaceV2 is
         uint256 amount,
         uint256 price,
         address paymentToken
-    ) external whenNotPaused nonReentrant noFlashLoan returns (uint256) {
+    ) external whenNotPaused nonReentrant returns (uint256) {
         if (price == 0) revert InvalidPrice();
         if (amount == 0) revert InvalidAmount();
         if (nftContract == address(0)) revert ZeroAddress();
@@ -266,6 +280,7 @@ contract MarketplaceV2 is
             createdAt: block.timestamp
         });
 
+        listingCreatedBlock[listingId] = block.number;
         userListings[msg.sender].push(listingId);
         activeListingId[msg.sender][nftContract][tokenId] = listingId;
 
@@ -285,7 +300,13 @@ contract MarketplaceV2 is
     // ============ Buy Functions ============
     function buy(
         uint256 listingId
-    ) external payable whenNotPaused nonReentrant noFlashLoan {
+    )
+        external
+        payable
+        whenNotPaused
+        nonReentrant
+        noSameBlockPurchase(listingId)
+    {
         Listing storage listing = listings[listingId];
 
         if (listing.status != ListingStatus.Active) revert ListingNotActive();
@@ -315,7 +336,7 @@ contract MarketplaceV2 is
     function buyWithToken(
         uint256 listingId,
         uint256 maxAmount
-    ) external whenNotPaused nonReentrant noFlashLoan {
+    ) external whenNotPaused nonReentrant noSameBlockPurchase(listingId) {
         Listing storage listing = listings[listingId];
 
         if (listing.status != ListingStatus.Active) revert ListingNotActive();
@@ -370,7 +391,7 @@ contract MarketplaceV2 is
             );
         }
 
-        // Distribute payments
+        // Platform fee: direct transfer (trusted recipient)
         if (platformAmount > 0) {
             (bool feeSuccess, ) = payable(feeRecipient).call{
                 value: platformAmount
@@ -378,17 +399,12 @@ contract MarketplaceV2 is
             if (!feeSuccess) revert TransferFailed();
         }
 
+        // Royalty and seller: pull-pattern to prevent DoS
         if (royaltyAmount > 0 && royaltyRecipient != address(0)) {
-            (bool royaltySuccess, ) = payable(royaltyRecipient).call{
-                value: royaltyAmount
-            }("");
-            if (!royaltySuccess) revert TransferFailed();
+            pendingWithdrawals[royaltyRecipient] += royaltyAmount;
         }
 
-        (bool sellerSuccess, ) = payable(listing.seller).call{
-            value: sellerAmount
-        }("");
-        if (!sellerSuccess) revert TransferFailed();
+        pendingWithdrawals[listing.seller] += sellerAmount;
     }
 
     function _executeSaleERC20(
@@ -529,13 +545,51 @@ contract MarketplaceV2 is
     }
 
     function version() external pure returns (string memory) {
-        return "2.0.0";
+        return "2.1.0";
+    }
+
+    /// @notice Withdraw accumulated funds from sales and royalties
+    function withdrawFunds() external nonReentrant {
+        uint256 amount = pendingWithdrawals[msg.sender];
+        if (amount == 0) revert NothingToWithdraw();
+
+        pendingWithdrawals[msg.sender] = 0;
+
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        if (!success) revert TransferFailed();
+
+        emit FundsWithdrawn(msg.sender, amount);
+    }
+
+    // ============ Upgrade Timelock ============
+    /// @notice Schedule an upgrade (must wait UPGRADE_DELAY before execution)
+    function scheduleUpgrade(
+        address newImplementation
+    ) external onlyRole(UPGRADER_ROLE) {
+        if (newImplementation == address(0)) revert ZeroAddress();
+        uint256 executableAt = block.timestamp + UPGRADE_DELAY;
+        scheduledUpgrades[newImplementation] = executableAt;
+        emit UpgradeScheduled(newImplementation, executableAt);
+    }
+
+    /// @notice Cancel a scheduled upgrade
+    function cancelUpgrade(
+        address newImplementation
+    ) external onlyRole(UPGRADER_ROLE) {
+        scheduledUpgrades[newImplementation] = 0;
+        emit UpgradeCancelled(newImplementation);
     }
 
     // ============ UUPS Required ============
     function _authorizeUpgrade(
         address newImplementation
-    ) internal override onlyRole(UPGRADER_ROLE) {}
+    ) internal override onlyRole(UPGRADER_ROLE) {
+        uint256 scheduledTime = scheduledUpgrades[newImplementation];
+        if (scheduledTime == 0) revert UpgradeNotScheduled();
+        if (block.timestamp < scheduledTime) revert UpgradeTooEarly();
+        // Clear the schedule after use
+        scheduledUpgrades[newImplementation] = 0;
+    }
 
     // ============ ERC165 ============
     function supportsInterface(
