@@ -469,4 +469,97 @@ describe("VickreyAuction", function () {
             expect(contractHash).to.equal(expectedHash);
         });
     });
+
+    describe("Unrevealed Deposit Recovery", function () {
+        let auctionId;
+        const bid1 = ethers.parseEther("3");
+        const bid2 = ethers.parseEther("2");
+        let salt1, salt2;
+
+        beforeEach(async function () {
+            await vickreyAuction.connect(seller).createAuction(
+                await erc721.getAddress(), 0, ethers.parseEther("1"), ONE_HOUR, THIRTY_MINUTES
+            );
+            auctionId = 0;
+
+            salt1 = ethers.randomBytes(32);
+            salt2 = ethers.randomBytes(32);
+
+            const hash1 = await vickreyAuction.getCommitmentHash(bid1, salt1);
+            const hash2 = await vickreyAuction.getCommitmentHash(bid2, salt2);
+
+            // Both bidders commit
+            await vickreyAuction.connect(bidder1).commitBid(auctionId, hash1, { value: bid1 });
+            await vickreyAuction.connect(bidder2).commitBid(auctionId, hash2, { value: bid2 });
+        });
+
+        it("Should allow unrevealed bidder to reclaim deposit after auction ends", async function () {
+            // Move to reveal phase
+            await time.increase(ONE_HOUR + 1);
+
+            // Only bidder1 reveals
+            await vickreyAuction.connect(bidder1).revealBid(auctionId, bid1, salt1);
+
+            // Move past reveal phase (auction ends)
+            await time.increase(THIRTY_MINUTES + 1);
+
+            // bidder2 didn't reveal, can now reclaim
+            const balanceBefore = await ethers.provider.getBalance(bidder2.address);
+            const tx = await vickreyAuction.connect(bidder2).reclaimUnrevealedDeposit(auctionId);
+            const receipt = await tx.wait();
+            const gasUsed = receipt.gasUsed * receipt.gasPrice;
+            const balanceAfter = await ethers.provider.getBalance(bidder2.address);
+
+            expect(balanceAfter + gasUsed - balanceBefore).to.equal(bid2);
+
+            await expect(tx).to.emit(vickreyAuction, "UnrevealedDepositReclaimed")
+                .withArgs(auctionId, bidder2.address, bid2);
+        });
+
+        it("Should revert if auction not ended", async function () {
+            // Still in commit phase
+            await expect(
+                vickreyAuction.connect(bidder2).reclaimUnrevealedDeposit(auctionId)
+            ).to.be.revertedWithCustomError(vickreyAuction, "AuctionNotEnded");
+        });
+
+        it("Should revert if bidder already revealed", async function () {
+            // Move to reveal phase
+            await time.increase(ONE_HOUR + 1);
+
+            // bidder1 reveals
+            await vickreyAuction.connect(bidder1).revealBid(auctionId, bid1, salt1);
+
+            // Move past reveal phase
+            await time.increase(THIRTY_MINUTES + 1);
+
+            // bidder1 cannot reclaim (already revealed)
+            await expect(
+                vickreyAuction.connect(bidder1).reclaimUnrevealedDeposit(auctionId)
+            ).to.be.revertedWithCustomError(vickreyAuction, "AlreadyRevealed");
+        });
+
+        it("Should revert if no deposit to reclaim", async function () {
+            // Move past auction end
+            await time.increase(ONE_HOUR + THIRTY_MINUTES + 2);
+
+            // bidder3 never committed
+            await expect(
+                vickreyAuction.connect(bidder3).reclaimUnrevealedDeposit(auctionId)
+            ).to.be.revertedWithCustomError(vickreyAuction, "NoDepositToReclaim");
+        });
+
+        it("Should prevent double reclaim", async function () {
+            // Move past auction end
+            await time.increase(ONE_HOUR + THIRTY_MINUTES + 2);
+
+            // First reclaim succeeds
+            await vickreyAuction.connect(bidder2).reclaimUnrevealedDeposit(auctionId);
+
+            // Second reclaim fails
+            await expect(
+                vickreyAuction.connect(bidder2).reclaimUnrevealedDeposit(auctionId)
+            ).to.be.revertedWithCustomError(vickreyAuction, "NoDepositToReclaim");
+        });
+    });
 });

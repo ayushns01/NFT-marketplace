@@ -81,6 +81,7 @@ contract VickreyAuction is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
     );
     event AuctionCancelled(uint256 indexed auctionId);
     event WithdrawalProcessed(address indexed bidder, uint256 amount);
+    event UnrevealedDepositReclaimed(uint256 indexed auctionId, address indexed bidder, uint256 amount);
 
     error InvalidDuration();
     error InvalidPrice();
@@ -95,6 +96,9 @@ contract VickreyAuction is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
     error TransferFailed();
     error ZeroAddress();
     error FeeTooHigh();
+    error AuctionNotEnded();
+    error AlreadyRevealed();
+    error NoDepositToReclaim();
 
     constructor(
         uint256 _platformFee,
@@ -310,6 +314,27 @@ contract VickreyAuction is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
         if (!success) revert TransferFailed();
 
         emit WithdrawalProcessed(msg.sender, amount);
+    }
+
+    /// @notice Reclaim deposit if bidder did not reveal (can only be called after auction ends)
+    /// @dev Allows bidders who committed but didn't reveal to recover their stuck deposits
+    /// @param auctionId The auction ID
+    function reclaimUnrevealedDeposit(uint256 auctionId) external nonReentrant {
+        AuctionPhase phase = getPhase(auctionId);
+        if (phase != AuctionPhase.Ended) revert AuctionNotEnded();
+
+        Commitment storage commitment = commitments[auctionId][msg.sender];
+        if (commitment.hash == bytes32(0)) revert NoDepositToReclaim();
+        if (commitment.revealed) revert AlreadyRevealed();
+        if (commitment.deposit == 0) revert NoDepositToReclaim();
+
+        uint256 refund = commitment.deposit;
+        commitment.deposit = 0; // Prevent reentrancy and double-claim
+
+        (bool success, ) = payable(msg.sender).call{value: refund}("");
+        if (!success) revert TransferFailed();
+
+        emit UnrevealedDepositReclaimed(auctionId, msg.sender, refund);
     }
 
     /// @notice Get current auction phase
