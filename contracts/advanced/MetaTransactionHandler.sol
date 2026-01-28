@@ -14,12 +14,15 @@ contract MetaTransactionHandler is EIP712, Ownable, ReentrancyGuard {
         bytes data;
         uint256 nonce;
         uint256 deadline;
+        uint256 chainId; // Prevent cross-chain replay attacks
     }
 
     bytes32 private constant META_TX_TYPEHASH =
         keccak256(
-            "MetaTransaction(address from,address to,uint256 value,bytes data,uint256 nonce,uint256 deadline)"
+            "MetaTransaction(address from,address to,uint256 value,bytes data,uint256 nonce,uint256 deadline,uint256 chainId)"
         );
+
+    error InvalidChainId();
 
     mapping(address => uint256) public nonces;
     mapping(address => bool) public trustedRelayers;
@@ -48,6 +51,7 @@ contract MetaTransactionHandler is EIP712, Ownable, ReentrancyGuard {
     ) external nonReentrant returns (bytes memory) {
         if (!trustedRelayers[msg.sender]) revert OnlyRelayer();
         if (block.timestamp > metaTx.deadline) revert DeadlineExpired();
+        if (metaTx.chainId != block.chainid) revert InvalidChainId();
 
         address signer = _verify(metaTx, signature);
         if (signer != metaTx.from) revert InvalidSignature();
@@ -84,7 +88,8 @@ contract MetaTransactionHandler is EIP712, Ownable, ReentrancyGuard {
                     metaTx.value,
                     keccak256(metaTx.data),
                     metaTx.nonce,
-                    metaTx.deadline
+                    metaTx.deadline,
+                    metaTx.chainId
                 )
             )
         );

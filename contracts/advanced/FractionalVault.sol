@@ -124,16 +124,23 @@ contract FractionalVault is ReentrancyGuard {
         if (vault.state != VaultState.Active) revert VaultNotActive();
         if (msg.value < vault.reservePrice) revert InsufficientPayment();
 
+        // CEI Pattern: Update state BEFORE external calls
         vault.state = VaultState.Bought;
-        vault.buyoutPrice = msg.value; // NEW: Store buyout amount for claims
+        vault.buyoutPrice = msg.value;
 
-        IERC721(vault.nftContract).transferFrom(
+        // Cache values before external call
+        address nftContract = vault.nftContract;
+        uint256 tokenId = vault.tokenId;
+
+        // Emit event before external call
+        emit BuyoutInitiated(vaultId, msg.sender, msg.value);
+
+        // External call last (Checks-Effects-Interactions)
+        IERC721(nftContract).transferFrom(
             address(this),
             msg.sender,
-            vault.tokenId
+            tokenId
         );
-
-        emit BuyoutInitiated(vaultId, msg.sender, msg.value);
     }
 
     /// @notice Claim pro-rata share of buyout proceeds

@@ -18,12 +18,15 @@ contract LazyMinting is EIP712, Ownable, ReentrancyGuard, Pausable {
         address nftContract;
         uint256 royaltyFee;
         uint256 nonce;
+        uint256 deadline; // Expiration timestamp to prevent stale vouchers
     }
 
     bytes32 private constant VOUCHER_TYPEHASH =
         keccak256(
-            "NFTVoucher(uint256 tokenId,uint256 price,string uri,address creator,address nftContract,uint256 royaltyFee,uint256 nonce)"
+            "NFTVoucher(uint256 tokenId,uint256 price,string uri,address creator,address nftContract,uint256 royaltyFee,uint256 nonce,uint256 deadline)"
         );
+
+    error VoucherExpired();
 
     uint256 public platformFee;
     address public feeRecipient;
@@ -63,6 +66,7 @@ contract LazyMinting is EIP712, Ownable, ReentrancyGuard, Pausable {
         NFTVoucher calldata voucher,
         bytes calldata signature
     ) external payable whenNotPaused nonReentrant returns (uint256) {
+        if (block.timestamp > voucher.deadline) revert VoucherExpired();
         if (msg.value < voucher.price) revert InsufficientPayment();
         if (voucher.price == 0) revert InvalidPrice();
         if (!authorizedContracts[voucher.nftContract])
@@ -114,7 +118,8 @@ contract LazyMinting is EIP712, Ownable, ReentrancyGuard, Pausable {
                     voucher.creator,
                     voucher.nftContract,
                     voucher.royaltyFee,
-                    voucher.nonce
+                    voucher.nonce,
+                    voucher.deadline
                 )
             )
         );
