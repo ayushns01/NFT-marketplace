@@ -3,6 +3,9 @@
  * 
  * Deploys all core contracts to the specified network.
  * 
+ * ⚠️ WARNING: These contracts are NOT AUDITED. 
+ * Do not deploy to mainnet with real value.
+ * 
  * Usage:
  *   npx hardhat run scripts/deploy.js --network sepolia
  *   npx hardhat run scripts/deploy.js --network polygon

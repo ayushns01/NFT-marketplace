@@ -1,173 +1,105 @@
-# 🎨 NFT Marketplace
+# NFT Marketplace
 
-> NFT marketplace with UUPS upgradeability, role-based access control, and advanced auction mechanisms.
+## Overview
 
-[![Solidity](https://img.shields.io/badge/Solidity-0.8.20%20|%200.8.22-blue)](https://soliditylang.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/Tests-152%20passing-brightgreen)](./test)
+A Solidity smart contract project exploring NFT marketplace mechanics, auction mechanisms, and DeFi primitives. Built as a learning exercise to understand:
 
----
+- NFT trading (ERC-721 & ERC-1155)
+- Various auction types (English, Dutch, Vickrey sealed-bid)
+- AMM concepts (bonding curves)
+- NFT fractionalization
+- Meta-transactions & lazy minting
+- Upgradeable contract patterns (UUPS)
 
-## 🏗️ Architecture
-
-```mermaid
-graph TB
-    subgraph Core["Core Contracts"]
-        M[Marketplace.sol]
-        MV2[MarketplaceV2.sol<br/>UUPS Upgradeable]
-        AE[AuctionEngine.sol]
-        NF[NFTFactory.sol]
-    end
-    
-    subgraph Advanced["Advanced Features"]
-        FV[FractionalVault.sol]
-        VA[VickreyAuction.sol<br/>Sealed-Bid]
-        BC[BondingCurve.sol<br/>AMM Pricing]
-        LM[LazyMinting.sol<br/>EIP-712]
-        MTH[MetaTransactionHandler.sol]
-    end
-    
-    subgraph Tokens["Token Standards"]
-        E721[ERC721NFT.sol]
-        E1155[ERC1155NFT.sol]
-        E721I[ERC721NFTInitializable.sol]
-        E1155I[ERC1155NFTInitializable.sol]
-    end
-    
-    subgraph Shared["Shared Infrastructure"]
-        PS[PaymentSplitter.sol]
-        IA[IAuction.sol]
-        IH[IMarketplaceHook.sol]
-    end
-    
-    NF --> E721I
-    NF --> E1155I
-    M --> PS
-    MV2 --> PS
-    AE --> IA
-    VA --> IA
-```
-
----
-
-## ✅ Features
-
-### Core
-| Feature | Contract | Status |
-|---------|----------|--------|
-| ERC-721 & ERC-1155 support | `Marketplace.sol` | ✅ |
-| Buy/Sell/List NFTs | `Marketplace.sol` | ✅ |
-| Offer system | `Marketplace.sol` | ✅ |
-| English auctions | `AuctionEngine.sol` | ✅ |
-| Dutch auctions | `AuctionEngine.sol` | ✅ |
-| Anti-sniping | `AuctionEngine.sol` | ✅ |
-| EIP-2981 royalties | All token contracts | ✅ |
-
-### Advanced
-| Feature | Contract | Status |
-|---------|----------|--------|
-| UUPS Upgradeability | `MarketplaceV2.sol` | ✅ |
-| Role-based access | `MarketplaceV2.sol` | ✅ |
-| ERC20 payments | `MarketplaceV2.sol` | ✅ |
-| Lazy minting (EIP-712) | `LazyMinting.sol` | ✅ |
-| Meta-transactions | `MetaTransactionHandler.sol` | ✅ |
-| Fractional ownership | `FractionalVault.sol` | ✅ |
-| Sealed-bid auctions | `VickreyAuction.sol` | ✅ |
-| Bonding curves | `BondingCurve.sol` | ✅ |
-| Hook system | `IMarketplaceHook.sol` | ✅ |
-| Flash loan resistance | Core contracts | ✅ |
-
----
-
-## 🔐 Security
-
-| Pattern | Implementation |
-|---------|----------------|
-| Reentrancy protection | OpenZeppelin `ReentrancyGuard` |
-| Access control | `AccessControl` with roles |
-| Flash loan resistance | Same-block interaction prevention |
-| Pausable | Emergency stop functionality |
-| CEI pattern | All state changes before transfers |
-| Locked pragma | `0.8.20` / `0.8.22` |
-
----
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 contracts/
-├── core/
-│   ├── Marketplace.sol         # Basic marketplace
-│   ├── MarketplaceV2.sol       # Upgradeable + ERC20 + roles
-│   ├── AuctionEngine.sol       # English & Dutch auctions
-│   └── NFTFactory.sol          # Clone-based deployment
-├── advanced/
-│   ├── FractionalVault.sol     # NFT fractionalization
-│   ├── VickreyAuction.sol      # Sealed-bid commit-reveal
-│   ├── BondingCurve.sol        # AMM for NFT collections
-│   ├── LazyMinting.sol         # Gas-free minting
-│   └── MetaTransactionHandler.sol
-├── tokens/
-│   ├── erc721/                 # ERC-721 implementations
-│   └── erc1155/                # ERC-1155 implementations
-├── libraries/
-│   └── PaymentSplitter.sol     # Shared fee distribution
-└── interfaces/
-    ├── IAuction.sol            # Auction interface hierarchy
-    └── IMarketplaceHook.sol    # Extensibility hooks
+├── core/           # Marketplace, AuctionEngine, NFTFactory
+├── advanced/       # BondingCurve, FractionalVault, VickreyAuction, LazyMinting
+├── tokens/         # ERC721 & ERC1155 implementations
+├── interfaces/     # Contract interfaces
+└── mocks/          # Test mocks
 ```
 
----
+## Features Implemented
 
-## 🚀 Quick Start
+| Feature | Contract | Status |
+|---------|----------|--------|
+| Fixed-price listings | `Marketplace.sol` | ✅ Complete |
+| ERC-20 payments | `MarketplaceV2.sol` | ✅ Complete |
+| English auctions | `AuctionEngine.sol` | ✅ Complete |
+| Dutch auctions | `AuctionEngine.sol` | ✅ Complete |
+| Vickrey sealed-bid | `VickreyAuction.sol` | ✅ Complete |
+| Bonding curves | `BondingCurve.sol` | ✅ Complete |
+| NFT fractionalization | `FractionalVault.sol` | ✅ Complete |
+| Lazy minting (EIP-712) | `LazyMinting.sol` | ✅ Complete |
+| Meta-transactions | `MetaTransactionHandler.sol` | ✅ Complete |
+| UUPS upgradeability | `MarketplaceV2.sol` | ✅ Complete |
+
+## Known Limitations & Security Notes
+
+This project is for **learning purposes**. Known issues include:
+
+- No formal security audit
+- Limited invariant/fuzz testing on financial logic
+- Some contracts may have unaddressed edge cases
+- Gas optimization is not prioritized
+- Not tested against MEV/sandwich attacks
+
+See the code comments for specific areas that would need hardening for production use.
+
+## Installation
 
 ```bash
-# Install
+# Clone the repository
+git clone https://github.com/ayushns01/NFT-marketplace.git
+cd NFT-marketplace
+
+# Install dependencies
 npm install
 
-# Compile
+# Compile contracts
 npm run compile
+```
 
-# Test
-npm run test
+## Testing
 
-# Coverage
+```bash
+# Run all tests
+npm test
+
+# Run tests with gas reporting
+npm run test:gas
+
+# Run coverage
 npm run coverage
-
-# Deploy
-npm run deploy:sepolia
 ```
 
----
+## Local Deployment
 
-## 🧪 Testing
+```bash
+# Start local node
+npx hardhat node
 
-```
-152 tests passing
-
-- AuctionEngine: 30 tests
-- Marketplace: 25 tests
-- NFTFactory: 17 tests
-- FractionalVault: 15 tests
-- LazyMinting: 9 tests
-- MetaTransactionHandler: 9 tests
-- Token contracts: 47 tests
+# Deploy to local network
+npm run deploy:local
 ```
 
----
+## Tech Stack
 
-## 🛠️ Technology
+- **Solidity** ^0.8.20
+- **Hardhat** - Development framework
+- **OpenZeppelin** v5.4 - Contract libraries
+- **Ethers.js** v6 - Ethereum interactions
 
-| Layer | Technology |
-|-------|------------|
-| Smart Contracts | Solidity 0.8.20, 0.8.22 |
-| Framework | Hardhat |
-| Testing | Chai, Mocha |
-| Security | OpenZeppelin Contracts v5 |
-| Standards | ERC-721, ERC-1155, EIP-712, EIP-2981 |
+## Learning Resources
 
----
+This project was built while learning from:
+- [OpenZeppelin Contracts](https://docs.openzeppelin.com/contracts)
+- [Solidity by Example](https://solidity-by-example.org/)
+- [Foundry Book](https://book.getfoundry.sh/)
 
-## 📜 License
+## License
 
-MIT
+ISC

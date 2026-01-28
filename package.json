@@ -1,7 +1,7 @@
 {
   "name": "nft-marketplace",
   "version": "1.0.0",
-  "description": "> A production-grade, gas-optimized NFT marketplace supporting ERC-721 & ERC-1155 with advanced auction mechanisms, royalty enforcement, and cross-chain compatibility.",
+  "description": "An educational NFT marketplace project supporting ERC-721 & ERC-1155. Includes marketplace listings, English/Dutch auctions, Vickrey auctions, bonding curves, and fractionalization. NOT AUDITED - for learning purposes only.",
   "main": "index.js",
   "scripts": {
     "compile": "npx hardhat compile",
