@@ -52,7 +52,12 @@ describe("LazyMinting", function () {
         return { lazyMinting, nft, factory, owner, creator, buyer, feeRecipient };
     }
 
-    async function createVoucher(lazyMinting, nft, creator, tokenId, price, nonce) {
+    async function createVoucher(lazyMinting, nft, creator, tokenId, price, nonce, deadline = null) {
+        // Default deadline: 1 hour from now
+        if (deadline === null) {
+            deadline = Math.floor(Date.now() / 1000) + 3600;
+        }
+        
         const domain = {
             name: "LazyMinting",
             version: "1",
@@ -68,7 +73,8 @@ describe("LazyMinting", function () {
                 { name: "creator", type: "address" },
                 { name: "nftContract", type: "address" },
                 { name: "royaltyFee", type: "uint256" },
-                { name: "nonce", type: "uint256" }
+                { name: "nonce", type: "uint256" },
+                { name: "deadline", type: "uint256" }
             ]
         };
 
@@ -79,7 +85,8 @@ describe("LazyMinting", function () {
             creator: creator.address,
             nftContract: await nft.getAddress(),
             royaltyFee: 500,
-            nonce: nonce
+            nonce: nonce,
+            deadline: deadline
         };
 
         const signature = await creator.signTypedData(domain, types, voucher);
@@ -171,7 +178,8 @@ describe("LazyMinting", function () {
                     { name: "creator", type: "address" },
                     { name: "nftContract", type: "address" },
                     { name: "royaltyFee", type: "uint256" },
-                    { name: "nonce", type: "uint256" }
+                    { name: "nonce", type: "uint256" },
+                    { name: "deadline", type: "uint256" }
                 ]
             };
 
@@ -182,7 +190,8 @@ describe("LazyMinting", function () {
                 creator: creator.address,
                 nftContract: await nft.getAddress(),
                 royaltyFee: 500,
-                nonce: 0
+                nonce: 0,
+                deadline: Math.floor(Date.now() / 1000) + 3600
             };
 
             // Sign with owner instead of creator
@@ -263,7 +272,8 @@ describe("LazyMinting", function () {
                     { name: "creator", type: "address" },
                     { name: "nftContract", type: "address" },
                     { name: "royaltyFee", type: "uint256" },
-                    { name: "nonce", type: "uint256" }
+                    { name: "nonce", type: "uint256" },
+                    { name: "deadline", type: "uint256" }
                 ]
             };
 
@@ -274,7 +284,8 @@ describe("LazyMinting", function () {
                 creator: creator.address,
                 nftContract: fakeNft,
                 royaltyFee: 500,
-                nonce: 0
+                nonce: 0,
+                deadline: Math.floor(Date.now() / 1000) + 3600
             };
 
             const signature = await creator.signTypedData(domain, types, voucher);

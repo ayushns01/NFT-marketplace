@@ -23,10 +23,11 @@ describe("MetaTransactionHandler", function () {
     }
 
     async function createMetaTx(handler, user, to, value, data, deadline, nonce) {
+        const chainId = (await ethers.provider.getNetwork()).chainId;
         const domain = {
             name: "MetaTransactionHandler",
             version: "1",
-            chainId: (await ethers.provider.getNetwork()).chainId,
+            chainId: chainId,
             verifyingContract: await handler.getAddress()
         };
 
@@ -37,7 +38,8 @@ describe("MetaTransactionHandler", function () {
                 { name: "value", type: "uint256" },
                 { name: "data", type: "bytes" },
                 { name: "nonce", type: "uint256" },
-                { name: "deadline", type: "uint256" }
+                { name: "deadline", type: "uint256" },
+                { name: "chainId", type: "uint256" }
             ]
         };
 
@@ -47,7 +49,8 @@ describe("MetaTransactionHandler", function () {
             value: value,
             data: data,
             nonce: nonce,
-            deadline: deadline
+            deadline: deadline,
+            chainId: chainId
         };
 
         const signature = await user.signTypedData(domain, types, message);
@@ -201,12 +204,13 @@ describe("MetaTransactionHandler", function () {
 
             const deadline = (await time.latest()) + 3600;
             const data = counter.interface.encodeFunctionData("increment");
+            const chainId = (await ethers.provider.getNetwork()).chainId;
 
             // Sign with wrong signer
             const domain = {
                 name: "MetaTransactionHandler",
                 version: "1",
-                chainId: (await ethers.provider.getNetwork()).chainId,
+                chainId: chainId,
                 verifyingContract: await handler.getAddress()
             };
 
@@ -217,7 +221,8 @@ describe("MetaTransactionHandler", function () {
                     { name: "value", type: "uint256" },
                     { name: "data", type: "bytes" },
                     { name: "nonce", type: "uint256" },
-                    { name: "deadline", type: "uint256" }
+                    { name: "deadline", type: "uint256" },
+                    { name: "chainId", type: "uint256" }
                 ]
             };
 
@@ -227,7 +232,8 @@ describe("MetaTransactionHandler", function () {
                 value: 0,
                 data: data,
                 nonce: 0,
-                deadline: deadline
+                deadline: deadline,
+                chainId: chainId
             };
 
             // But signed by owner
