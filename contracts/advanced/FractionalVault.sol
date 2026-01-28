@@ -251,7 +251,15 @@ contract FractionalVault is ReentrancyGuard {
 }
 
 contract ShareToken is ERC20 {
-    address public immutable vault; // FIXED: Made immutable per Slither
+    address public immutable vault;
+    
+    // Track approvals specifically for vault burning
+    mapping(address => bool) public approvedForVaultBurn;
+
+    error NotApprovedForVaultBurn();
+    error OnlyVault();
+
+    event VaultBurnApproval(address indexed owner, bool approved);
 
     constructor(
         string memory name_,
@@ -263,8 +271,18 @@ contract ShareToken is ERC20 {
         _mint(recipient, totalSupply_);
     }
 
+    /// @notice Approve the vault to burn your shares (required before claimProceeds)
+    /// @param approved Whether to approve or revoke approval
+    function approveVaultBurn(bool approved) external {
+        approvedForVaultBurn[msg.sender] = approved;
+        emit VaultBurnApproval(msg.sender, approved);
+    }
+
+    /// @notice Burn shares from an account (vault only, requires user approval)
+    /// @dev User must call approveVaultBurn(true) before vault can burn their shares
     function burnFrom(address account, uint256 amount) external {
-        require(msg.sender == vault, "Only vault");
+        if (msg.sender != vault) revert OnlyVault();
+        if (!approvedForVaultBurn[account]) revert NotApprovedForVaultBurn();
         _burn(account, amount);
     }
 }

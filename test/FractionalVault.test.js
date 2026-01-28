@@ -190,6 +190,11 @@ describe("FractionalVault", function () {
             // shareholder1: 300k/1M = 30% = 3 ETH
             // shareholder2: 200k/1M = 20% = 2 ETH
 
+            // IMPORTANT: Users must approve vault to burn their shares before claiming
+            await shareToken.connect(curator).approveVaultBurn(true);
+            await shareToken.connect(shareholder1).approveVaultBurn(true);
+            await shareToken.connect(shareholder2).approveVaultBurn(true);
+
             const curatorBalBefore = await ethers.provider.getBalance(curator.address);
             const tx1 = await vault.connect(curator).claimProceeds(0);
             const receipt1 = await tx1.wait();
@@ -229,9 +234,20 @@ describe("FractionalVault", function () {
 
             expect(await shareToken.balanceOf(curator.address)).to.equal(500000);
 
+            // Approve vault to burn shares
+            await shareToken.connect(curator).approveVaultBurn(true);
             await vault.connect(curator).claimProceeds(0);
 
             expect(await shareToken.balanceOf(curator.address)).to.equal(0);
+        });
+
+        it("should revert if not approved for vault burn", async function () {
+            const { vault, curator, shareToken } = await loadFixture(boughtOutFixture);
+
+            // Try to claim without approving - should fail
+            await expect(
+                vault.connect(curator).claimProceeds(0)
+            ).to.be.revertedWithCustomError(shareToken, "NotApprovedForVaultBurn");
         });
 
         it("should revert if no shares to claim", async function () {
@@ -283,6 +299,12 @@ describe("FractionalVault", function () {
                 "Test",
                 "TST"
             );
+
+            // Get share token and approve vault burn
+            const vaultData = await vault.getVault(0);
+            const ShareToken = await ethers.getContractFactory("ShareToken");
+            const shareToken = ShareToken.attach(vaultData.shareToken);
+            await shareToken.connect(curator).approveVaultBurn(true);
 
             // Curator has all shares, can redeem
             const tx = await vault.connect(curator).redeem(0);
