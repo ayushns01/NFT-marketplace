@@ -27,7 +27,7 @@ contract FractionalVault is ReentrancyGuard {
 
     uint256 private _vaultIdCounter;
     mapping(uint256 => Vault) public vaults;
-    mapping(address => uint256) public nftToVault;
+    mapping(bytes32 => uint256) public nftToVault; // keccak256(nftContract, tokenId) => vaultId
     mapping(uint256 => uint256) public claimedShares; // NEW: Track claimed shares per vault
 
     event VaultCreated(
@@ -79,7 +79,8 @@ contract FractionalVault is ReentrancyGuard {
         string memory shareSymbol
     ) external nonReentrant returns (uint256) {
         if (totalShares == 0) revert InvalidShares();
-        if (nftToVault[nftContract] != 0) revert NFTAlreadyVaulted();
+        bytes32 nftKey = keccak256(abi.encode(nftContract, tokenId));
+        if (nftToVault[nftKey] != 0) revert NFTAlreadyVaulted();
 
         IERC721(nftContract).transferFrom(msg.sender, address(this), tokenId);
 
@@ -104,7 +105,7 @@ contract FractionalVault is ReentrancyGuard {
             createdAt: block.timestamp
         });
 
-        nftToVault[nftContract] = vaultId;
+        nftToVault[nftKey] = vaultId;
 
         emit VaultCreated(
             vaultId,
