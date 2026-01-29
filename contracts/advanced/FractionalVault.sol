@@ -29,6 +29,7 @@ contract FractionalVault is ReentrancyGuard {
     mapping(uint256 => Vault) public vaults;
     mapping(bytes32 => uint256) public nftToVault; // keccak256(nftContract, tokenId) => vaultId
     mapping(uint256 => uint256) public claimedShares; // NEW: Track claimed shares per vault
+    mapping(uint256 => uint256) public vaultBalances; // NEW: Track ETH balance per vault
 
     event VaultCreated(
         uint256 indexed vaultId,
@@ -128,6 +129,7 @@ contract FractionalVault is ReentrancyGuard {
         // CEI Pattern: Update state BEFORE external calls
         vault.state = VaultState.Bought;
         vault.buyoutPrice = msg.value;
+        vaultBalances[vaultId] = msg.value; // Track ETH for this specific vault
 
         // Cache values before external call
         address nftContract = vault.nftContract;
@@ -163,6 +165,7 @@ contract FractionalVault is ReentrancyGuard {
         // Burn shares before transfer (CEI pattern)
         shareToken.burnFrom(msg.sender, userShares);
         claimedShares[vaultId] += userShares;
+        vaultBalances[vaultId] -= payment; // Deduct from vault-specific balance
 
         // Transfer ETH
         (bool success, ) = payable(msg.sender).call{value: payment}("");
@@ -241,8 +244,11 @@ contract FractionalVault is ReentrancyGuard {
         ShareToken shareToken = ShareToken(vault.shareToken);
         if (shareToken.totalSupply() != 0) revert NothingToClaim();
 
-        uint256 dust = address(this).balance;
+        // Use per-vault balance tracking instead of contract balance
+        uint256 dust = vaultBalances[vaultId];
         if (dust == 0) revert NothingToClaim();
+
+        vaultBalances[vaultId] = 0;
 
         (bool success, ) = payable(msg.sender).call{value: dust}("");
         if (!success) revert TransferFailed();
