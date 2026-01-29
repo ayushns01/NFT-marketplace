@@ -104,18 +104,70 @@ Critical financial invariants are now tested in Foundry:
 - ✅ NFT custody matches listing state
 - ✅ Pending withdrawals ≤ contract balance
 
+## Additional Fixes (January 2026)
+
+#### 8. ✅ MarketplaceV2 Royalty Cap
+**Issue:** MarketplaceV2 was missing the 10% royalty cap present in V1.
+
+**Fix:** Added royalty cap to both `_executeSaleETH` and `_executeSaleERC20`:
+```solidity
+royaltyAmount = amount > (price / 10) ? (price / 10) : amount;
+```
+
+**Impact:** High - Prevents malicious NFT contracts from draining buyers.
+
+#### 9. ✅ Royalty Recipient Validation
+**Issue:** Could send royalties to zero address if NFT returns invalid data.
+
+**Fix:** Skip royalty if recipient is zero address:
+```solidity
+if (royaltyRecipient == address(0)) {
+    royaltyAmount = 0;
+}
+```
+
+**Impact:** Medium - Prevents fund loss to zero address.
+
+#### 10. ✅ FractionalVault Per-Vault Balance Tracking
+**Issue:** `withdrawDust()` used `address(this).balance`, allowing cross-vault fund theft.
+
+**Fix:** Added `vaultBalances` mapping to track ETH per vault:
+```solidity
+mapping(uint256 => uint256) public vaultBalances;
+```
+
+**Impact:** High - Prevents curators from stealing other vaults' funds.
+
+#### 11. ✅ MetaTransactionHandler Gas Limit
+**Issue:** No gas limit on meta-transaction execution, enabling relayer griefing.
+
+**Fix:** Added 500k gas limit:
+```solidity
+uint256 gasLimit = gasleft() > 550000 ? 500000 : gasleft() - 50000;
+(bool success, bytes memory returnData) = metaTx.to.call{
+    value: metaTx.value,
+    gas: gasLimit
+}(metaTx.data);
+```
+
+**Impact:** Medium - Prevents relayer griefing attacks.
+
+#### 12. ✅ Protocol Registry for Emergency Pause
+**Issue:** No way to pause entire protocol atomically.
+
+**Fix:** Added `ProtocolRegistry.sol` contract with emergency pause functionality.
+
+**Impact:** Medium - Enables coordinated emergency response.
+
 ## Remaining Known Issues
 
 ### Medium Priority
-1. **No royalty recipient validation** - Could send to zero address if NFT returns invalid data
-2. **ERC1155 buyout complexity** - FractionalVault only supports ERC721
-3. **No circuit breakers** - No emergency pause for entire protocol
-4. **Limited upgrade patterns** - Only MarketplaceV2 is upgradeable
+1. **ERC1155 buyout complexity** - FractionalVault only supports ERC721
+2. **Limited upgrade patterns** - Only MarketplaceV2 is upgradeable
 
 ### Low Priority
 1. **Gas optimization** - Not production-optimized
-2. **Event indexing** - Some events missing indexed parameters
-3. **Storage layout** - Not formally documented for upgrades
+2. **Storage layout** - Not formally documented for upgrades
 
 ## Security Best Practices Implemented
 
