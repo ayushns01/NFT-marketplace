@@ -375,8 +375,15 @@ contract MarketplaceV2 is
             IERC2981(listing.nftContract).royaltyInfo(listing.tokenId, price)
         returns (address receiver, uint256 amount) {
             royaltyRecipient = receiver;
-            royaltyAmount = amount;
+            // Cap royalty at 10% to prevent malicious NFT contracts from draining buyers
+            royaltyAmount = amount > (price / 10) ? (price / 10) : amount;
         } catch {}
+        
+        // Skip royalty if recipient is zero address
+        if (royaltyRecipient == address(0)) {
+            royaltyAmount = 0;
+        }
+        
         uint256 sellerAmount = price - platformAmount - royaltyAmount;
 
         // Transfer NFT
@@ -427,8 +434,15 @@ contract MarketplaceV2 is
             IERC2981(listing.nftContract).royaltyInfo(listing.tokenId, price)
         returns (address receiver, uint256 amount) {
             royaltyRecipient = receiver;
-            royaltyAmount = amount;
+            // Cap royalty at 10% to prevent malicious NFT contracts from draining buyers
+            royaltyAmount = amount > (price / 10) ? (price / 10) : amount;
         } catch {}
+        
+        // Skip royalty if recipient is zero address
+        if (royaltyRecipient == address(0)) {
+            royaltyAmount = 0;
+        }
+        
         uint256 sellerAmount = price - platformAmount - royaltyAmount;
 
         // Transfer NFT
@@ -449,9 +463,11 @@ contract MarketplaceV2 is
         }
 
         // Transfer tokens using SafeERC20
-        token.safeTransferFrom(buyer, feeRecipient, platformAmount);
+        if (platformAmount > 0) {
+            token.safeTransferFrom(buyer, feeRecipient, platformAmount);
+        }
 
-        if (royaltyAmount > 0 && royaltyRecipient != address(0)) {
+        if (royaltyAmount > 0) {
             token.safeTransferFrom(buyer, royaltyRecipient, royaltyAmount);
         }
 
