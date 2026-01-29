@@ -82,6 +82,7 @@ contract VickreyAuction is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
     event AuctionCancelled(uint256 indexed auctionId);
     event WithdrawalProcessed(address indexed bidder, uint256 amount);
     event UnrevealedDepositReclaimed(uint256 indexed auctionId, address indexed bidder, uint256 amount);
+    event DepositReclaimed(uint256 indexed auctionId, address indexed bidder, uint256 amount);
 
     error InvalidDuration();
     error InvalidPrice();
