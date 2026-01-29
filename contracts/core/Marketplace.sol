@@ -346,7 +346,8 @@ contract Marketplace is
             IERC2981(listing.nftContract).royaltyInfo(listing.tokenId, price)
         returns (address receiver, uint256 amount) {
             royaltyRecipient = receiver;
-            royaltyAmount = amount;
+            // Cap royalty at 10% to prevent malicious NFT contracts
+            royaltyAmount = amount > (price / 10) ? (price / 10) : amount;
         } catch {}
         uint256 sellerAmount = price - platformAmount - royaltyAmount;
 

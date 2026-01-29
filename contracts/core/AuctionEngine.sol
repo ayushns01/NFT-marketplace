@@ -403,7 +403,8 @@ contract AuctionEngine is
             IERC2981(auction.nftContract).royaltyInfo(auction.tokenId, price)
         returns (address receiver, uint256 amount) {
             royaltyRecipient = receiver;
-            royaltyAmount = amount;
+            // Cap royalty at 10% to prevent malicious NFT contracts
+            royaltyAmount = amount > (price / 10) ? (price / 10) : amount;
         } catch {}
         uint256 sellerAmount = price - platformAmount - royaltyAmount;
 
