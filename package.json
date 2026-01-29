@@ -7,12 +7,14 @@
     "compile": "npx hardhat compile",
     "test": "npx hardhat test",
     "test:gas": "REPORT_GAS=true npx hardhat test",
+    "test:invariant": "forge test --match-path 'test/invariant/*.sol' -vvv",
+    "test:all": "npm test && forge test",
     "coverage": "npx hardhat coverage",
     "deploy:sepolia": "npx hardhat run scripts/deploy.js --network sepolia",
     "deploy:polygon": "npx hardhat run scripts/deploy.js --network polygon",
     "deploy:local": "npx hardhat run scripts/deploy.js --network hardhat",
-    "slither": "slither .",
-    "clean": "npx hardhat clean"
+    "slither": "slither . --filter-paths 'node_modules|lib' --exclude naming-convention",
+    "clean": "npx hardhat clean && forge clean"
   },
   "repository": {
     "type": "git",
