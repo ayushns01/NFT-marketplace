@@ -37,17 +37,17 @@ contracts/
 | Meta-transactions | `MetaTransactionHandler.sol` | ✅ Complete |
 | UUPS upgradeability | `MarketplaceV2.sol` | ✅ Complete |
 
-## Known Limitations & Security Notes
+## Security Improvements
 
-This project is for **learning purposes**. Known issues include:
-
-- No formal security audit
-- Limited invariant/fuzz testing on financial logic
-- Some contracts may have unaddressed edge cases
-- Gas optimization is not prioritized
-- Not tested against MEV/sandwich attacks
-
-See the code comments for specific areas that would need hardening for production use.
+Critical bugs fixed based on professional audit:
+- ✅ **FractionalVault mapping collision** - Fixed to support multiple tokens per NFT contract
+- ✅ **BondingCurve ownership verification** - Added NFT ownership checks before transfers
+- ✅ **Royalty caps implemented** - Limited to 10% to prevent malicious NFT contracts
+- ✅ **UUPS upgrade timelock** - Enforced 2-day delay on upgrades
+- ✅ **VickreyAuction deposit reclaim** - Added function for unrevealed bidders
+- ✅ **Slippage protection** - Added to BondingCurve.sell()
+- ✅ **Batch operation bounds** - Limited to 100 items to prevent gas exhaustion
+- ✅ **Invariant tests added** - Foundry tests for critical financial invariants
 
 ## Installation
 
@@ -66,7 +66,7 @@ npm run compile
 ## Testing
 
 ```bash
-# Run all tests
+# Run Hardhat tests
 npm test
 
 # Run tests with gas reporting
@@ -74,10 +74,50 @@ npm run test:gas
 
 # Run coverage
 npm run coverage
+
+# Run Foundry invariant tests
+forge test --match-path "test/invariant/*.sol" -vvv
+
+# Run Slither static analysis
+slither . --filter-paths "node_modules|lib" --exclude naming-convention
 ```
 
 ## Local Deployment
 
+```
+
+## Testnet Deployments
+
+### Sepolia (Ethereum Testnet)
+
+Deployment planned for Q1 2026. This section will be updated with verified contract addresses.
+
+**Planned contracts:**
+- Marketplace
+- MarketplaceV2 (UUPS Proxy)
+- AuctionEngine
+- NFTFactory
+- FractionalVault
+- LazyMinting
+- BondingCurve
+- VickreyAuction
+
+**Deployment checklist:**
+- [ ] Deploy to Sepolia testnet
+- [ ] Verify contracts on Etherscan
+- [ ] Test all major flows with real transactions
+- [ ] Document gas costs for each operation
+- [ ] Create deployment postmortem
+
+To deploy when ready:
+```bash
+# Set environment variables in .env
+SEPOLIA_RPC_URL=<your_infura/alchemy_url>
+PRIVATE_KEY=<deployer_private_key>
+ETHERSCAN_API_KEY=<your_etherscan_key>
+
+# Deploy to Sepolia
+npm run deploy:sepolia
 ```bash
 # Start local node
 npx hardhat node
