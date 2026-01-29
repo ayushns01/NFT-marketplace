@@ -112,6 +112,7 @@ contract ERC1155NFT is
     ) public whenNotPaused returns (uint256[] memory) {
         if (to == address(0)) revert InvalidAddress();
         if (amounts.length != tokenURIs.length) revert ArrayLengthMismatch();
+        if (amounts.length == 0 || amounts.length > 100) revert InvalidQuantity();
 
         if (whitelistEnabled && !whitelist[msg.sender]) {
             revert NotWhitelisted();
@@ -177,6 +178,7 @@ contract ERC1155NFT is
         address[] calldata accounts,
         bool status
     ) external onlyOwner {
+        require(accounts.length <= 100, "Batch size exceeds limit");
         unchecked {
             for (uint256 i = 0; i < accounts.length; i++) {
                 if (accounts[i] != address(0)) {
