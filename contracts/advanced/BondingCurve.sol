@@ -163,6 +163,11 @@ contract BondingCurve is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
 
         pool.reserveBalance += forReserve;
 
+        // Verify contract owns the NFT before transfer
+        if (IERC721(pool.nftContract).ownerOf(tokenId) != address(this)) {
+            revert NotTokenOwner();
+        }
+
         // Transfer NFT to buyer
         IERC721(pool.nftContract).safeTransferFrom(
             address(this),
@@ -197,9 +202,11 @@ contract BondingCurve is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
     /// @notice Sell a token back to the curve
     /// @param poolId The pool to sell to
     /// @param tokenId The token ID to sell
+    /// @param minPrice Minimum price to accept (slippage protection)
     function sell(
         uint256 poolId,
-        uint256 tokenId
+        uint256 tokenId,
+        uint256 minPrice
     ) external whenNotPaused nonReentrant {
         Pool storage pool = pools[poolId];
         if (pool.nftContract == address(0)) revert InvalidPool();
@@ -208,6 +215,7 @@ contract BondingCurve is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
             revert NotTokenOwner();
 
         uint256 price = getSellPrice(poolId);
+        if (price < minPrice) revert SlippageExceeded();
         if (pool.reserveBalance < price) revert InsufficientReserve();
 
         pool.currentSupply--;

@@ -279,7 +279,7 @@ describe("BondingCurve", function () {
             const sellPrice = await bondingCurve.getSellPrice(0);
             const balanceBefore = await ethers.provider.getBalance(buyer.address);
 
-            const tx = await bondingCurve.connect(buyer).sell(0, 0);
+            const tx = await bondingCurve.connect(buyer).sell(0, 0, 0); // minPrice = 0 for test
             const receipt = await tx.wait();
             const gasUsed = receipt.gasUsed * receipt.gasPrice;
 
@@ -300,7 +300,7 @@ describe("BondingCurve", function () {
 
         it("Should fail if not token owner", async function () {
             await expect(
-                bondingCurve.connect(buyer2).sell(0, 0)
+                bondingCurve.connect(buyer2).sell(0, 0, 0)
             ).to.be.revertedWithCustomError(bondingCurve, "NotTokenOwner");
         });
 
@@ -316,8 +316,19 @@ describe("BondingCurve", function () {
             await erc721.connect(buyer).approve(await bondingCurve.getAddress(), 1);
 
             await expect(
-                bondingCurve.connect(buyer).sell(1, 1)
+                bondingCurve.connect(buyer).sell(1, 1, 0)
             ).to.be.revertedWithCustomError(bondingCurve, "BuybackDisabled");
+        });
+
+        it("Should fail if price below minPrice (slippage protection)", async function () {
+            await erc721.connect(buyer).approve(await bondingCurve.getAddress(), 0);
+
+            const sellPrice = await bondingCurve.getSellPrice(0);
+            const minPriceTooHigh = sellPrice + ethers.parseEther("1");
+
+            await expect(
+                bondingCurve.connect(buyer).sell(0, 0, minPriceTooHigh)
+            ).to.be.revertedWithCustomError(bondingCurve, "SlippageExceeded");
         });
     });
 
