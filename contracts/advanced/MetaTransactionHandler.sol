@@ -59,8 +59,11 @@ contract MetaTransactionHandler is EIP712, Ownable, ReentrancyGuard {
         if (metaTx.nonce != nonces[metaTx.from]) revert InvalidSignature();
         nonces[metaTx.from]++;
 
+        // Gas limit of 500k to prevent relayer griefing attacks
+        uint256 gasLimit = gasleft() > 550000 ? 500000 : gasleft() - 50000;
         (bool success, bytes memory returnData) = metaTx.to.call{
-            value: metaTx.value
+            value: metaTx.value,
+            gas: gasLimit
         }(metaTx.data);
 
         emit MetaTransactionExecuted(
