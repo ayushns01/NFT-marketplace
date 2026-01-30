@@ -19,14 +19,16 @@ contract LazyMinting is EIP712, Ownable, ReentrancyGuard, Pausable {
         uint256 royaltyFee;
         uint256 nonce;
         uint256 deadline; // Expiration timestamp to prevent stale vouchers
+        uint256 chainId;  // FIX C-3: Prevent cross-chain replay attacks
     }
 
     bytes32 private constant VOUCHER_TYPEHASH =
         keccak256(
-            "NFTVoucher(uint256 tokenId,uint256 price,string uri,address creator,address nftContract,uint256 royaltyFee,uint256 nonce,uint256 deadline)"
+            "NFTVoucher(uint256 tokenId,uint256 price,string uri,address creator,address nftContract,uint256 royaltyFee,uint256 nonce,uint256 deadline,uint256 chainId)"
         );
 
     error VoucherExpired();
+    error InvalidChainId();
 
     uint256 public platformFee;
     address public feeRecipient;
@@ -66,6 +68,8 @@ contract LazyMinting is EIP712, Ownable, ReentrancyGuard, Pausable {
         NFTVoucher calldata voucher,
         bytes calldata signature
     ) external payable whenNotPaused nonReentrant returns (uint256) {
+        // FIX C-3: Validate chainId to prevent cross-chain replay
+        if (voucher.chainId != block.chainid) revert InvalidChainId();
         if (block.timestamp > voucher.deadline) revert VoucherExpired();
         if (msg.value < voucher.price) revert InsufficientPayment();
         if (voucher.price == 0) revert InvalidPrice();
@@ -119,7 +123,8 @@ contract LazyMinting is EIP712, Ownable, ReentrancyGuard, Pausable {
                     voucher.nftContract,
                     voucher.royaltyFee,
                     voucher.nonce,
-                    voucher.deadline
+                    voucher.deadline,
+                    voucher.chainId  // FIX C-3: Include chainId in hash
                 )
             )
         );
