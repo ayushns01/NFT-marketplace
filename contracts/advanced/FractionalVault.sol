@@ -2,11 +2,12 @@
 pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract FractionalVault is ReentrancyGuard {
+contract FractionalVault is ReentrancyGuard, IERC721Receiver {
     enum VaultState {
         Active,
         Bought,
@@ -25,9 +26,10 @@ contract FractionalVault is ReentrancyGuard {
         uint256 createdAt;
     }
 
-    uint256 private _vaultIdCounter;
+    // FIX H-5: Start at 1 so vault ID 0 can be used as "not vaulted" sentinel
+    uint256 private _vaultIdCounter = 1;
     mapping(uint256 => Vault) public vaults;
-    mapping(bytes32 => uint256) public nftToVault; // keccak256(nftContract, tokenId) => vaultId
+    mapping(bytes32 => uint256) public nftToVault; // keccak256(nftContract, tokenId) => vaultId (0 = not vaulted)
     mapping(uint256 => uint256) public claimedShares; // NEW: Track claimed shares per vault
     mapping(uint256 => uint256) public vaultBalances; // NEW: Track ETH balance per vault
 
@@ -83,7 +85,8 @@ contract FractionalVault is ReentrancyGuard {
         bytes32 nftKey = keccak256(abi.encode(nftContract, tokenId));
         if (nftToVault[nftKey] != 0) revert NFTAlreadyVaulted();
 
-        IERC721(nftContract).transferFrom(msg.sender, address(this), tokenId);
+        // Use safeTransferFrom for safety
+        IERC721(nftContract).safeTransferFrom(msg.sender, address(this), tokenId);
 
         ShareToken shareToken = new ShareToken(
             shareName,
@@ -139,7 +142,8 @@ contract FractionalVault is ReentrancyGuard {
         emit BuyoutInitiated(vaultId, msg.sender, msg.value);
 
         // External call last (Checks-Effects-Interactions)
-        IERC721(nftContract).transferFrom(
+        // FIX C-1: Use safeTransferFrom instead of transferFrom for recipient safety
+        IERC721(nftContract).safeTransferFrom(
             address(this),
             msg.sender,
             tokenId
@@ -254,6 +258,17 @@ contract FractionalVault is ReentrancyGuard {
         if (!success) revert TransferFailed();
 
         emit DustWithdrawn(vaultId, msg.sender, dust);
+    }
+
+    /// @notice Required for receiving ERC721 tokens via safeTransferFrom
+    /// @dev Implements IERC721Receiver interface
+    function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes calldata
+    ) external pure override returns (bytes4) {
+        return IERC721Receiver.onERC721Received.selector;
     }
 }
 
