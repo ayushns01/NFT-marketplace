@@ -82,6 +82,12 @@ contract BondingCurve is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
     error InvalidParams();
     error ZeroAddress();
     error FeeTooHigh();
+    error NotPoolCreator();
+    error NoTokensAvailable();
+    error TokenNotInPool();
+
+    event TokensDeposited(uint256 indexed poolId, address indexed depositor, uint256[] tokenIds);
+    event TokensWithdrawn(uint256 indexed poolId, address indexed creator, uint256[] tokenIds);
 
     constructor(
         uint256 _platformFee,
@@ -132,27 +138,92 @@ contract BondingCurve is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
         return poolId;
     }
 
+    /// @notice Deposit NFTs into the pool for sale (FIX C-2)
+    /// @param poolId The pool to deposit to
+    /// @param tokenIds Array of token IDs to deposit
+    function depositTokens(uint256 poolId, uint256[] calldata tokenIds) 
+        external 
+        whenNotPaused
+        nonReentrant 
+    {
+        Pool storage pool = pools[poolId];
+        if (pool.nftContract == address(0)) revert InvalidPool();
+        if (msg.sender != pool.creator) revert NotPoolCreator();
+        
+        IERC721 nft = IERC721(pool.nftContract);
+        uint256 len = tokenIds.length;
+        
+        for (uint256 i = 0; i < len; ) {
+            nft.safeTransferFrom(msg.sender, address(this), tokenIds[i]);
+            poolTokenIds[poolId].push(tokenIds[i]);
+            unchecked { ++i; }
+        }
+        
+        emit TokensDeposited(poolId, msg.sender, tokenIds);
+    }
+
+    /// @notice Withdraw unsold NFTs from the pool (creator only)
+    /// @param poolId The pool to withdraw from
+    /// @param tokenIds Array of token IDs to withdraw
+    function withdrawTokens(uint256 poolId, uint256[] calldata tokenIds)
+        external
+        nonReentrant
+    {
+        Pool storage pool = pools[poolId];
+        if (msg.sender != pool.creator) revert NotPoolCreator();
+        
+        IERC721 nft = IERC721(pool.nftContract);
+        
+        for (uint256 i = 0; i < tokenIds.length; ) {
+            _removeTokenFromPool(poolId, tokenIds[i]);
+            nft.safeTransferFrom(address(this), msg.sender, tokenIds[i]);
+            unchecked { ++i; }
+        }
+        
+        emit TokensWithdrawn(poolId, msg.sender, tokenIds);
+    }
+
+    /// @dev Remove a token from the pool's available tokens array
+    function _removeTokenFromPool(uint256 poolId, uint256 tokenId) internal {
+        uint256[] storage tokens = poolTokenIds[poolId];
+        uint256 len = tokens.length;
+        for (uint256 i = 0; i < len; ) {
+            if (tokens[i] == tokenId) {
+                tokens[i] = tokens[len - 1];
+                tokens.pop();
+                return;
+            }
+            unchecked { ++i; }
+        }
+        revert TokenNotInPool();
+    }
+
     error SlippageExceeded();
 
-    /// @notice Buy a token at current curve price with slippage protection
+    /// @notice Buy a token at current curve price with slippage protection (FIX C-2)
     /// @param poolId The pool to buy from
-    /// @param tokenId The token ID to purchase (must be owned by pool or mintable)
     /// @param maxPrice Maximum price willing to pay (slippage protection)
     function buy(
         uint256 poolId,
-        uint256 tokenId,
         uint256 maxPrice
     ) external payable whenNotPaused nonReentrant {
         Pool storage pool = pools[poolId];
         if (pool.nftContract == address(0)) revert InvalidPool();
         if (pool.currentSupply >= pool.maxSupply) revert MaxSupplyReached();
+        
+        // FIX C-2: Check available tokens from deposited pool
+        uint256[] storage availableTokens = poolTokenIds[poolId];
+        if (availableTokens.length == 0) revert NoTokensAvailable();
 
         uint256 price = getBuyPrice(poolId);
         if (price > maxPrice) revert SlippageExceeded();
         if (msg.value < price) revert InsufficientPayment();
 
+        // Get last token (gas efficient pop)
+        uint256 tokenId = availableTokens[availableTokens.length - 1];
+        availableTokens.pop();
+        
         pool.currentSupply++;
-        poolTokenIds[poolId].push(tokenId);
         tokenToPool[pool.nftContract][tokenId] = poolId;
 
         // Calculate fee distribution
@@ -162,11 +233,6 @@ contract BondingCurve is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
         uint256 forCreator = price - fee - forReserve;
 
         pool.reserveBalance += forReserve;
-
-        // Verify contract owns the NFT before transfer
-        if (IERC721(pool.nftContract).ownerOf(tokenId) != address(this)) {
-            revert NotTokenOwner();
-        }
 
         // Transfer NFT to buyer
         IERC721(pool.nftContract).safeTransferFrom(
@@ -227,6 +293,9 @@ contract BondingCurve is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
             address(this),
             tokenId
         );
+        
+        // FIX: Add token back to available pool for resale
+        poolTokenIds[poolId].push(tokenId);
 
         // Pay seller
         (bool success, ) = payable(msg.sender).call{value: price}("");
@@ -319,6 +388,16 @@ contract BondingCurve is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
     /// @notice Get pool info
     function getPool(uint256 poolId) external view returns (Pool memory) {
         return pools[poolId];
+    }
+
+    /// @notice Get available token IDs in pool
+    function getAvailableTokens(uint256 poolId) external view returns (uint256[] memory) {
+        return poolTokenIds[poolId];
+    }
+
+    /// @notice Get count of available tokens in pool
+    function getAvailableTokenCount(uint256 poolId) external view returns (uint256) {
+        return poolTokenIds[poolId].length;
     }
 
     // Admin functions
