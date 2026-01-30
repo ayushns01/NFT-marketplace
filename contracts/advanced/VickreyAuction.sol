@@ -100,6 +100,11 @@ contract VickreyAuction is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
     error AuctionNotEnded();
     error AlreadyRevealed();
     error NoDepositToReclaim();
+    error AuctionNotSettled();  // FIX C-4
+    error WinnerCannotReclaim(); // FIX C-4
+    error AlreadyReclaimed();    // FIX C-4
+
+    event LosingBidReclaimed(uint256 indexed auctionId, address indexed bidder, uint256 amount);
 
     constructor(
         uint256 _platformFee,
@@ -228,11 +233,13 @@ contract VickreyAuction is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
             auction.secondHighestBid = bid;
         }
 
-        // Refund excess deposit immediately
-        uint256 refund = commitment.deposit - bid;
-        if (refund > 0) {
-            pendingWithdrawals[msg.sender] += refund;
+        // FIX C-4: Only refund excess over bid, keep bid amount for later reclaim
+        uint256 excessDeposit = commitment.deposit - bid;
+        if (excessDeposit > 0) {
+            pendingWithdrawals[msg.sender] += excessDeposit;
         }
+        // Store the actual bid amount for potential reclaim by losers
+        commitment.deposit = bid;
 
         emit BidRevealed(auctionId, msg.sender, bid);
     }
@@ -274,8 +281,10 @@ contract VickreyAuction is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
         uint256 fee = (paidPrice * platformFee) / 10000;
         uint256 sellerProceeds = paidPrice - fee;
 
-        // Refund winner's excess (they committed highestBid, paying secondHighestBid)
-        uint256 winnerRefund = auction.highestBid - paidPrice;
+        // FIX C-4: Clear winner's deposit and refund excess to pendingWithdrawals
+        Commitment storage winnerCommitment = commitments[auctionId][auction.highestBidder];
+        uint256 winnerRefund = winnerCommitment.deposit - paidPrice;
+        winnerCommitment.deposit = 0; // Clear winner's deposit to prevent any confusion
         if (winnerRefund > 0) {
             pendingWithdrawals[auction.highestBidder] += winnerRefund;
         }
@@ -336,6 +345,35 @@ contract VickreyAuction is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
         if (!success) revert TransferFailed();
 
         emit UnrevealedDepositReclaimed(auctionId, msg.sender, refund);
+    }
+
+    /// @notice Reclaim bid after losing auction (FIX C-4)
+    /// @param auctionId The auction ID
+    /// @dev Only callable after auction is settled, only for revealed losing bids
+    function reclaimLosingBid(uint256 auctionId) external nonReentrant {
+        Auction storage auction = auctions[auctionId];
+        
+        // Must be settled
+        if (!auction.settled) revert AuctionNotSettled();
+        
+        Commitment storage commitment = commitments[auctionId][msg.sender];
+        
+        // Must have revealed (unrevealed deposits use reclaimUnrevealedDeposit)
+        if (!commitment.revealed) revert NotBidder();
+        
+        // Winner cannot use this - their funds handled in settle()
+        if (msg.sender == auction.highestBidder) revert WinnerCannotReclaim();
+        
+        // Must have unclaimed deposit (the bid amount after excess was refunded during reveal)
+        if (commitment.deposit == 0) revert AlreadyReclaimed();
+        
+        uint256 refund = commitment.deposit;
+        commitment.deposit = 0;
+        
+        (bool success, ) = payable(msg.sender).call{value: refund}("");
+        if (!success) revert TransferFailed();
+        
+        emit LosingBidReclaimed(auctionId, msg.sender, refund);
     }
 
     /// @notice Get current auction phase
