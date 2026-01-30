@@ -2,23 +2,24 @@
 
 ## Overview
 
-A Solidity smart contract project exploring NFT marketplace mechanics, auction mechanisms, and DeFi primitives. Built as a learning exercise to understand:
+A comprehensive Solidity smart contract project implementing a full-featured NFT marketplace with multiple trading mechanisms, auction types, and DeFi primitives. Built with security-first design patterns including:
 
-- NFT trading (ERC-721 & ERC-1155)
+- NFT trading (ERC-721 & ERC-1155) with royalty support (EIP-2981)
 - Various auction types (English, Dutch, Vickrey sealed-bid)
-- AMM concepts (bonding curves)
-- NFT fractionalization
-- Meta-transactions & lazy minting
-- Upgradeable contract patterns (UUPS)
+- AMM concepts (bonding curves with linear/exponential pricing)
+- NFT fractionalization with pro-rata buyout distribution
+- Meta-transactions & lazy minting (EIP-712)
+- Upgradeable contract patterns (UUPS with timelock)
+- Protocol-wide emergency controls
 
 ## Project Structure
 
 ```
 contracts/
-├── core/           # Marketplace, AuctionEngine, NFTFactory
-├── advanced/       # BondingCurve, FractionalVault, VickreyAuction, LazyMinting
-├── tokens/         # ERC721 & ERC1155 implementations
-├── interfaces/     # Contract interfaces
+├── core/           # Marketplace, MarketplaceV2, AuctionEngine, NFTFactory, ProtocolRegistry
+├── advanced/       # BondingCurve, FractionalVault, VickreyAuction, LazyMinting, MetaTransactionHandler
+├── tokens/         # ERC721 & ERC1155 implementations (standard + initializable)
+├── interfaces/     # Contract interfaces (IAuction, IMarketplaceHook)
 └── mocks/          # Test mocks
 ```
 
@@ -36,18 +37,35 @@ contracts/
 | Lazy minting (EIP-712) | `LazyMinting.sol` | ✅ Complete |
 | Meta-transactions | `MetaTransactionHandler.sol` | ✅ Complete |
 | UUPS upgradeability | `MarketplaceV2.sol` | ✅ Complete |
+| Protocol emergency pause | `ProtocolRegistry.sol` | ✅ Complete |
+| Clone factory pattern | `NFTFactory.sol` | ✅ Complete |
 
-## Security Improvements
+## Security Features
 
-Critical bugs fixed based on professional audit:
+### Design Patterns
+- ✅ **Checks-Effects-Interactions** - Consistent CEI pattern across all contracts
+- ✅ **Pull over Push** - Pending withdrawals for safe payment distribution
+- ✅ **Reentrancy Guards** - All external value transfers protected
+- ✅ **Flash Loan Protection** - Same-block purchase restrictions on listings/auctions
+
+### Critical Fixes Implemented
 - ✅ **FractionalVault mapping collision** - Fixed to support multiple tokens per NFT contract
 - ✅ **BondingCurve ownership verification** - Added NFT ownership checks before transfers
-- ✅ **Royalty caps implemented** - Limited to 10% to prevent malicious NFT contracts
+- ✅ **Royalty caps** - Limited to 10% to prevent malicious NFT contracts
 - ✅ **UUPS upgrade timelock** - Enforced 2-day delay on upgrades
-- ✅ **VickreyAuction deposit reclaim** - Added function for unrevealed bidders
-- ✅ **Slippage protection** - Added to BondingCurve.sell()
+- ✅ **VickreyAuction deposit reclaim** - Functions for unrevealed and losing bidders
+- ✅ **Slippage protection** - Added to BondingCurve buy/sell operations
 - ✅ **Batch operation bounds** - Limited to 100 items to prevent gas exhaustion
-- ✅ **Invariant tests added** - Foundry tests for critical financial invariants
+- ✅ **DoS prevention** - Pull-pattern for creator/seller payments in BondingCurve & VickreyAuction
+- ✅ **Per-vault balance tracking** - Prevents cross-vault fund theft in FractionalVault
+- ✅ **Cross-chain replay protection** - ChainId validation in meta-transactions
+
+### Testing
+- ✅ **Unit tests** - Hardhat tests covering all contracts
+- ✅ **Invariant tests** - Foundry property-based tests for financial logic
+- ✅ **Static analysis** - Slither integration in CI (GitHub Actions)
+
+> ⚠️ **WARNING**: This project has NOT been professionally audited. See [SECURITY.md](SECURITY.md) for details.
 
 ## Installation
 
@@ -84,6 +102,12 @@ slither . --filter-paths "node_modules|lib" --exclude naming-convention
 
 ## Local Deployment
 
+```bash
+# Start local node
+npx hardhat node
+
+# Deploy to local network
+npm run deploy:local
 ```
 
 ## Testnet Deployments
@@ -129,9 +153,20 @@ npm run deploy:local
 ## Tech Stack
 
 - **Solidity** ^0.8.20
-- **Hardhat** - Development framework
-- **OpenZeppelin** v5.4 - Contract libraries
+- **Hardhat** - Development framework & testing
+- **Foundry** - Invariant/fuzz testing
+- **OpenZeppelin** v5.x - Contract libraries (standard + upgradeable)
 - **Ethers.js** v6 - Ethereum interactions
+
+## Architecture Highlights
+
+| Pattern | Implementation |
+|---------|---------------|
+| Pull Payments | `pendingWithdrawals` mappings prevent DoS |
+| Clone Factory | `NFTFactory` uses minimal proxies (EIP-1167) |
+| UUPS Upgrades | `MarketplaceV2` with 2-day timelock |
+| Role-Based Access | `AccessControl` in MarketplaceV2 & ProtocolRegistry |
+| EIP-712 Signatures | Typed data signing for lazy minting & meta-tx |
 
 ## Learning Resources
 
@@ -139,6 +174,7 @@ This project was built while learning from:
 - [OpenZeppelin Contracts](https://docs.openzeppelin.com/contracts)
 - [Solidity by Example](https://solidity-by-example.org/)
 - [Foundry Book](https://book.getfoundry.sh/)
+- [Consensys Smart Contract Best Practices](https://consensys.github.io/smart-contract-best-practices/)
 
 ## License
 
