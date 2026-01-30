@@ -192,7 +192,8 @@ contract FractionalVault is ReentrancyGuard, IERC721Receiver {
 
         shareToken.burnFrom(msg.sender, vault.totalShares);
 
-        IERC721(vault.nftContract).transferFrom(
+        // Use safeTransferFrom for recipient safety - ensures receiver can handle ERC721
+        IERC721(vault.nftContract).safeTransferFrom(
             address(this),
             msg.sender,
             vault.tokenId
