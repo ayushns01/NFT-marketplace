@@ -258,7 +258,7 @@ contract Marketplace is
         emit ListingCancelled(listingId);
     }
 
-    function updatePrice(uint256 listingId, uint256 newPrice) external {
+    function updatePrice(uint256 listingId, uint256 newPrice) external nonReentrant {
         if (newPrice == 0) revert InvalidPrice();
 
         Listing storage listing = listings[listingId];
