@@ -314,17 +314,23 @@ describe("VickreyAuction", function () {
             const fee = (paidPrice * BigInt(PLATFORM_FEE)) / 10000n;
             const sellerProceeds = paidPrice - fee;
 
-            const sellerBalanceBefore = await ethers.provider.getBalance(seller.address);
-            const ownerBalanceBefore = await ethers.provider.getBalance(owner.address);
-
             await vickreyAuction.settle(auctionId);
 
-            const sellerBalanceAfter = await ethers.provider.getBalance(seller.address);
-            const ownerBalanceAfter = await ethers.provider.getBalance(owner.address);
+            // Payments now use pull-pattern - check pending withdrawals
+            const sellerPending = await vickreyAuction.pendingWithdrawals(seller.address);
+            const ownerPending = await vickreyAuction.pendingWithdrawals(owner.address);
 
-            expect(sellerBalanceAfter - sellerBalanceBefore).to.equal(sellerProceeds);
-            // Use closeTo for fee to account for any gas/precision differences
-            expect(ownerBalanceAfter - ownerBalanceBefore).to.be.closeTo(fee, ethers.parseEther("0.001"));
+            expect(sellerPending).to.equal(sellerProceeds);
+            expect(ownerPending).to.equal(fee);
+
+            // Verify withdrawals work correctly
+            const sellerBalanceBefore = await ethers.provider.getBalance(seller.address);
+            const tx = await vickreyAuction.connect(seller).withdraw();
+            const receipt = await tx.wait();
+            const gasUsed = receipt.gasUsed * receipt.gasPrice;
+            const sellerBalanceAfter = await ethers.provider.getBalance(seller.address);
+            
+            expect(sellerBalanceAfter - sellerBalanceBefore + gasUsed).to.equal(sellerProceeds);
         });
 
         it("Should refund winner excess (bid - paid price)", async function () {

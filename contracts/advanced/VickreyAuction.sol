@@ -296,14 +296,12 @@ contract VickreyAuction is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
             auction.tokenId
         );
 
-        // Distribute payments
-        (bool feeSuccess, ) = payable(feeRecipient).call{value: fee}("");
-        if (!feeSuccess) revert TransferFailed();
-
-        (bool sellerSuccess, ) = payable(auction.seller).call{
-            value: sellerProceeds
-        }("");
-        if (!sellerSuccess) revert TransferFailed();
+        // Distribute payments using pull-pattern to prevent DoS
+        // If feeRecipient or seller is a malicious contract that reverts,
+        // using direct transfer would brick the settlement. Pull-pattern ensures
+        // the auction can always settle, and recipients withdraw separately.
+        pendingWithdrawals[feeRecipient] += fee;
+        pendingWithdrawals[auction.seller] += sellerProceeds;
 
         emit AuctionSettled(
             auctionId,
