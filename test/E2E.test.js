@@ -183,7 +183,7 @@ describe("E2E Integration Tests", function () {
             );
             await fracTx.wait();
             
-            const vault = await fractionalVault.getVault(0);
+            const vault = await fractionalVault.getVault(1);
             console.log("✅ NFT fractionalized into", totalShares.toString(), "shares");
 
             // Step 2: Distribute shares
@@ -210,24 +210,24 @@ describe("E2E Integration Tests", function () {
             // Step 4: Buyout by external party (owner in this case)
             const buyoutPrice = ethers.parseEther("15"); // Above reserve
             console.log("\n💎 External buyer initiating buyout at", ethers.formatEther(buyoutPrice), "ETH...");
-            await fractionalVault.connect(owner).buyout(0, { value: buyoutPrice });
+            await fractionalVault.connect(owner).buyout(1, { value: buyoutPrice });
             console.log("✅ Buyout successful, NFT transferred to buyer");
 
             // Step 5: Shareholders claim proceeds
             console.log("\n🏦 Shareholders claiming proceeds...");
             
-            const sellerClaimable = await fractionalVault.getClaimableAmount(0, seller.address);
-            const buyerClaimable = await fractionalVault.getClaimableAmount(0, buyer.address);
-            const buyer2Claimable = await fractionalVault.getClaimableAmount(0, buyer2.address);
+            const sellerClaimable = await fractionalVault.getClaimableAmount(1, seller.address);
+            const buyerClaimable = await fractionalVault.getClaimableAmount(1, buyer.address);
+            const buyer2Claimable = await fractionalVault.getClaimableAmount(1, buyer2.address);
             
             console.log("   Seller claimable:", ethers.formatEther(sellerClaimable), "ETH");
             console.log("   Buyer claimable:", ethers.formatEther(buyerClaimable), "ETH");
             console.log("   Buyer2 claimable:", ethers.formatEther(buyer2Claimable), "ETH");
 
             // Claim proceeds
-            await fractionalVault.connect(seller).claimProceeds(0);
-            await fractionalVault.connect(buyer).claimProceeds(0);
-            await fractionalVault.connect(buyer2).claimProceeds(0);
+            await fractionalVault.connect(seller).claimProceeds(1);
+            await fractionalVault.connect(buyer).claimProceeds(1);
+            await fractionalVault.connect(buyer2).claimProceeds(1);
             
             console.log("✅ All proceeds claimed");
 
@@ -237,7 +237,7 @@ describe("E2E Integration Tests", function () {
 
             console.log("\n📊 Final State:");
             console.log("   NFT Owner:", await nft.ownerOf(2));
-            console.log("   Vault State:", (await fractionalVault.getVault(0)).state);
+            console.log("   Vault State:", (await fractionalVault.getVault(1)).state);
             console.log("   Total Distributed:", ethers.formatEther(totalClaimed), "ETH");
         });
     });

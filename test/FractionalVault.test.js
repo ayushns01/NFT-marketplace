@@ -47,7 +47,7 @@ describe("FractionalVault", function () {
             await expect(tx).to.emit(vault, "VaultCreated");
 
             // Verify vault state
-            const vaultData = await vault.getVault(0);
+            const vaultData = await vault.getVault(1);
             expect(vaultData.curator).to.equal(curator.address);
             expect(vaultData.totalShares).to.equal(1000000);
             expect(vaultData.reservePrice).to.equal(ethers.parseEther("10"));
@@ -85,7 +85,7 @@ describe("FractionalVault", function () {
                 "fTNFT"
             );
 
-            const vaultData = await vault.getVault(0);
+            const vaultData = await vault.getVault(1);
             const ShareToken = await ethers.getContractFactory("ShareToken");
             const shareToken = ShareToken.attach(vaultData.shareToken);
 
@@ -114,18 +114,18 @@ describe("FractionalVault", function () {
         it("should allow buyout at reserve price", async function () {
             const { vault, nft, buyer } = await loadFixture(fractionalizedFixture);
 
-            const tx = await vault.connect(buyer).buyout(0, {
+            const tx = await vault.connect(buyer).buyout(1, {
                 value: ethers.parseEther("10")
             });
 
             await expect(tx).to.emit(vault, "BuyoutInitiated")
-                .withArgs(0, buyer.address, ethers.parseEther("10"));
+                .withArgs(1, buyer.address, ethers.parseEther("10"));
 
             // Verify buyer received NFT
             expect(await nft.ownerOf(0)).to.equal(buyer.address);
 
             // Verify vault state changed
-            const vaultData = await vault.getVault(0);
+            const vaultData = await vault.getVault(1);
             expect(vaultData.state).to.equal(1); // Bought
             expect(vaultData.buyoutPrice).to.equal(ethers.parseEther("10"));
         });
@@ -134,7 +134,7 @@ describe("FractionalVault", function () {
             const { vault, buyer } = await loadFixture(fractionalizedFixture);
 
             await expect(
-                vault.connect(buyer).buyout(0, {
+                vault.connect(buyer).buyout(1, {
                     value: ethers.parseEther("9")
                 })
             ).to.be.revertedWithCustomError(vault, "InsufficientPayment");
@@ -143,11 +143,11 @@ describe("FractionalVault", function () {
         it("should allow buyout above reserve price", async function () {
             const { vault, nft, buyer } = await loadFixture(fractionalizedFixture);
 
-            await vault.connect(buyer).buyout(0, {
+            await vault.connect(buyer).buyout(1, {
                 value: ethers.parseEther("15")
             });
 
-            const vaultData = await vault.getVault(0);
+            const vaultData = await vault.getVault(1);
             expect(vaultData.buyoutPrice).to.equal(ethers.parseEther("15"));
         });
     });
@@ -168,7 +168,7 @@ describe("FractionalVault", function () {
             );
 
             // Transfer shares to shareholders
-            const vaultData = await vault.getVault(0);
+            const vaultData = await vault.getVault(1);
             const ShareToken = await ethers.getContractFactory("ShareToken");
             const shareToken = ShareToken.attach(vaultData.shareToken);
 
@@ -177,7 +177,7 @@ describe("FractionalVault", function () {
             await shareToken.connect(curator).transfer(shareholder2.address, 200000);
 
             // Buyout at 10 ETH
-            await vault.connect(buyer).buyout(0, { value: ethers.parseEther("10") });
+            await vault.connect(buyer).buyout(1, { value: ethers.parseEther("10") });
 
             return { ...base, shareToken };
         }
@@ -196,7 +196,7 @@ describe("FractionalVault", function () {
             await shareToken.connect(shareholder2).approveVaultBurn(true);
 
             const curatorBalBefore = await ethers.provider.getBalance(curator.address);
-            const tx1 = await vault.connect(curator).claimProceeds(0);
+            const tx1 = await vault.connect(curator).claimProceeds(1);
             const receipt1 = await tx1.wait();
             const gas1 = receipt1.gasUsed * receipt1.gasPrice;
             const curatorBalAfter = await ethers.provider.getBalance(curator.address);
@@ -205,11 +205,11 @@ describe("FractionalVault", function () {
             expect(curatorBalAfter - curatorBalBefore + gas1).to.equal(ethers.parseEther("5"));
 
             await expect(tx1).to.emit(vault, "ProceedsClaimed")
-                .withArgs(0, curator.address, 500000, ethers.parseEther("5"));
+                .withArgs(1, curator.address, 500000, ethers.parseEther("5"));
 
             // Shareholder1 claims
             const sh1BalBefore = await ethers.provider.getBalance(shareholder1.address);
-            const tx2 = await vault.connect(shareholder1).claimProceeds(0);
+            const tx2 = await vault.connect(shareholder1).claimProceeds(1);
             const receipt2 = await tx2.wait();
             const gas2 = receipt2.gasUsed * receipt2.gasPrice;
             const sh1BalAfter = await ethers.provider.getBalance(shareholder1.address);
@@ -218,7 +218,7 @@ describe("FractionalVault", function () {
 
             // Shareholder2 claims
             const sh2BalBefore = await ethers.provider.getBalance(shareholder2.address);
-            const tx3 = await vault.connect(shareholder2).claimProceeds(0);
+            const tx3 = await vault.connect(shareholder2).claimProceeds(1);
             const receipt3 = await tx3.wait();
             const gas3 = receipt3.gasUsed * receipt3.gasPrice;
             const sh2BalAfter = await ethers.provider.getBalance(shareholder2.address);
@@ -236,7 +236,7 @@ describe("FractionalVault", function () {
 
             // Approve vault to burn shares
             await shareToken.connect(curator).approveVaultBurn(true);
-            await vault.connect(curator).claimProceeds(0);
+            await vault.connect(curator).claimProceeds(1);
 
             expect(await shareToken.balanceOf(curator.address)).to.equal(0);
         });
@@ -246,7 +246,7 @@ describe("FractionalVault", function () {
 
             // Try to claim without approving - should fail
             await expect(
-                vault.connect(curator).claimProceeds(0)
+                vault.connect(curator).claimProceeds(1)
             ).to.be.revertedWithCustomError(shareToken, "NotApprovedForVaultBurn");
         });
 
@@ -254,7 +254,7 @@ describe("FractionalVault", function () {
             const { vault, buyer } = await loadFixture(boughtOutFixture);
 
             await expect(
-                vault.connect(buyer).claimProceeds(0) // buyer has no shares
+                vault.connect(buyer).claimProceeds(1) // buyer has no shares
             ).to.be.revertedWithCustomError(vault, "NothingToClaim");
         });
 
@@ -273,16 +273,16 @@ describe("FractionalVault", function () {
             );
 
             await expect(
-                vault.connect(curator).claimProceeds(0)
+                vault.connect(curator).claimProceeds(1)
             ).to.be.revertedWithCustomError(vault, "VaultNotBought");
         });
 
         it("should return correct claimable amount via view function", async function () {
             const { vault, curator, shareholder1, shareholder2 } = await loadFixture(boughtOutFixture);
 
-            expect(await vault.getClaimableAmount(0, curator.address)).to.equal(ethers.parseEther("5"));
-            expect(await vault.getClaimableAmount(0, shareholder1.address)).to.equal(ethers.parseEther("3"));
-            expect(await vault.getClaimableAmount(0, shareholder2.address)).to.equal(ethers.parseEther("2"));
+            expect(await vault.getClaimableAmount(1, curator.address)).to.equal(ethers.parseEther("5"));
+            expect(await vault.getClaimableAmount(1, shareholder1.address)).to.equal(ethers.parseEther("3"));
+            expect(await vault.getClaimableAmount(1, shareholder2.address)).to.equal(ethers.parseEther("2"));
         });
     });
 
@@ -301,13 +301,13 @@ describe("FractionalVault", function () {
             );
 
             // Get share token and approve vault burn
-            const vaultData = await vault.getVault(0);
+            const vaultData = await vault.getVault(1);
             const ShareToken = await ethers.getContractFactory("ShareToken");
             const shareToken = ShareToken.attach(vaultData.shareToken);
             await shareToken.connect(curator).approveVaultBurn(true);
 
             // Curator has all shares, can redeem
-            const tx = await vault.connect(curator).redeem(0);
+            const tx = await vault.connect(curator).redeem(1);
             await expect(tx).to.emit(vault, "VaultRedeemed");
 
             // NFT returned to curator
@@ -328,13 +328,13 @@ describe("FractionalVault", function () {
             );
 
             // Transfer some shares away
-            const vaultData = await vault.getVault(0);
+            const vaultData = await vault.getVault(1);
             const ShareToken = await ethers.getContractFactory("ShareToken");
             const shareToken = ShareToken.attach(vaultData.shareToken);
             await shareToken.connect(curator).transfer(shareholder1.address, 1);
 
             await expect(
-                vault.connect(curator).redeem(0)
+                vault.connect(curator).redeem(1)
             ).to.be.revertedWithCustomError(vault, "NotAllSharesOwned");
         });
     });
@@ -353,11 +353,11 @@ describe("FractionalVault", function () {
                 "TST"
             );
 
-            await expect(vault.connect(curator).updateReservePrice(0, ethers.parseEther("20")))
+            await expect(vault.connect(curator).updateReservePrice(1, ethers.parseEther("20")))
                 .to.emit(vault, "ReservePriceUpdated")
-                .withArgs(0, ethers.parseEther("20"));
+                .withArgs(1, ethers.parseEther("20"));
 
-            const vaultData = await vault.getVault(0);
+            const vaultData = await vault.getVault(1);
             expect(vaultData.reservePrice).to.equal(ethers.parseEther("20"));
         });
 
@@ -375,7 +375,7 @@ describe("FractionalVault", function () {
             );
 
             await expect(
-                vault.connect(buyer).updateReservePrice(0, ethers.parseEther("20"))
+                vault.connect(buyer).updateReservePrice(1, ethers.parseEther("20"))
             ).to.be.revertedWithCustomError(vault, "NotCurator");
         });
     });
