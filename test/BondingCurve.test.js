@@ -253,15 +253,25 @@ describe("BondingCurve", function () {
             const fee = (price * BigInt(PLATFORM_FEE)) / 10000n;
 
             const ownerBalanceBefore = await ethers.provider.getBalance(owner.address);
-            const creatorBalanceBefore = await ethers.provider.getBalance(creator.address);
 
             await bondingCurve.connect(buyer).buy(0, price, { value: price });
 
+            // Platform fee is sent directly to feeRecipient (owner)
             const ownerBalanceAfter = await ethers.provider.getBalance(owner.address);
-            const creatorBalanceAfter = await ethers.provider.getBalance(creator.address);
-
             expect(ownerBalanceAfter - ownerBalanceBefore).to.equal(fee);
-            expect(creatorBalanceAfter).to.be.gt(creatorBalanceBefore);
+
+            // Creator payment uses pull-pattern - must withdraw separately
+            const pendingPayment = await bondingCurve.pendingCreatorPayments(creator.address);
+            expect(pendingPayment).to.be.gt(0);
+
+            // Creator withdraws their payment
+            const creatorBalanceBefore = await ethers.provider.getBalance(creator.address);
+            const tx = await bondingCurve.connect(creator).withdrawCreatorPayments();
+            const receipt = await tx.wait();
+            const gasUsed = receipt.gasUsed * receipt.gasPrice;
+            const creatorBalanceAfter = await ethers.provider.getBalance(creator.address);
+            
+            expect(creatorBalanceAfter - creatorBalanceBefore + gasUsed).to.equal(pendingPayment);
         });
 
         it("Should fail if price exceeds maxPrice (slippage protection)", async function () {

@@ -47,6 +47,15 @@ contract BondingCurve is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
     uint256 public platformFee; // Basis points
     address public feeRecipient;
     uint256 public constant RATIO_SCALE = 1e18;
+    
+    // Named constants to avoid magic numbers and document intent
+    uint256 public constant SELL_SPREAD_PERCENT = 95; // Sellers receive 95% of buy price (5% spread)
+    uint256 public constant MAX_BATCH_SIZE = 100; // Prevent gas exhaustion in batch operations
+    uint256 public constant MAX_EXPONENTIAL_SUPPLY = 500; // Overflow protection for exponential curves
+    uint256 public constant MAX_ROYALTY_BPS = 2500; // 25% maximum royalty to prevent abuse
+    
+    // Pull-pattern mapping for creator payments (prevents DoS if creator is malicious contract)
+    mapping(address => uint256) public pendingCreatorPayments;
 
     mapping(uint256 => Pool) public pools;
     mapping(uint256 => uint256[]) public poolTokenIds; // Pool -> token IDs in pool
@@ -85,9 +94,14 @@ contract BondingCurve is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
     error NotPoolCreator();
     error NoTokensAvailable();
     error TokenNotInPool();
+    error InvalidMaxSupply();
+    error NothingToWithdraw();
 
     event TokensDeposited(uint256 indexed poolId, address indexed depositor, uint256[] tokenIds);
     event TokensWithdrawn(uint256 indexed poolId, address indexed creator, uint256[] tokenIds);
+    event CreatorPaymentAccrued(uint256 indexed poolId, address indexed creator, uint256 amount);
+    event CreatorPaymentWithdrawn(address indexed creator, uint256 amount);
+    event EmergencyTokenWithdrawn(uint256 indexed poolId, address indexed token, uint256 tokenId);
 
     constructor(
         uint256 _platformFee,
@@ -116,7 +130,9 @@ contract BondingCurve is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
     ) external whenNotPaused returns (uint256) {
         if (nftContract == address(0)) revert ZeroAddress();
         if (basePrice == 0) revert InvalidParams();
-        if (royaltyFee > 2500) revert InvalidParams(); // Max 25%
+        // Validate maxSupply to prevent unbounded pools and ensure pool has purpose
+        if (maxSupply == 0) revert InvalidMaxSupply();
+        if (royaltyFee > MAX_ROYALTY_BPS) revert InvalidParams();
 
         uint256 poolId = _poolIdCounter++;
 
@@ -241,20 +257,20 @@ contract BondingCurve is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
             tokenId
         );
 
-        // Distribute payments
+        // Platform fee: direct transfer (trusted, admin-controlled recipient)
         if (fee > 0) {
             (bool feeSuccess, ) = payable(feeRecipient).call{value: fee}("");
             if (!feeSuccess) revert TransferFailed();
         }
 
+        // Creator payment: use pull-pattern to prevent DoS if creator is malicious contract
+        // Creator must call withdrawCreatorPayments() to receive funds
         if (forCreator > 0) {
-            (bool creatorSuccess, ) = payable(pool.creator).call{
-                value: forCreator
-            }("");
-            if (!creatorSuccess) revert TransferFailed();
+            pendingCreatorPayments[pool.creator] += forCreator;
+            emit CreatorPaymentAccrued(poolId, pool.creator, forCreator);
         }
 
-        // Refund excess
+        // Refund excess payment to buyer
         if (msg.value > price) {
             (bool refundSuccess, ) = payable(msg.sender).call{
                 value: msg.value - price
@@ -311,15 +327,18 @@ contract BondingCurve is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
     }
 
     /// @notice Get current sell price (typically lower than buy for spread)
+    /// @dev Spread exists to: 1) Compensate reserve for liquidity provision
+    ///      2) Prevent arbitrage that would drain reserves 3) Create sustainable AMM economics
     function getSellPrice(uint256 poolId) public view returns (uint256) {
         Pool storage pool = pools[poolId];
         if (pool.currentSupply == 0) return 0;
 
-        // Sell price is one step back on the curve
+        // Sell price is one step back on the curve (previous supply level)
         uint256 buyPrice = _calculatePrice(pool, pool.currentSupply - 1);
 
-        // Apply a small spread (95% of buy price)
-        return (buyPrice * 95) / 100;
+        // Apply spread - sellers receive SELL_SPREAD_PERCENT of the buy price
+        // This 5% spread funds reserve solvency and prevents wash trading
+        return (buyPrice * SELL_SPREAD_PERCENT) / 100;
     }
 
     /// @notice Calculate price at a given supply level
@@ -338,27 +357,41 @@ contract BondingCurve is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
     }
 
     /// @notice Compute base^exp using binary exponentiation with fixed-point math
-    /// @dev O(log n) complexity, handles arbitrarily large exponents
+    /// @dev Binary exponentiation achieves O(log n) complexity vs O(n) naive iteration.
+    ///
+    /// WHY THIS ALGORITHM:
+    /// - Naive approach: multiply base n times = O(n) operations
+    /// - Binary exp: uses property that x^n = (x^(n/2))^2 for even n
+    /// - Example: x^13 = x^8 * x^4 * x^1 (13 = 1101 in binary)
+    ///
+    /// FIXED-POINT MATH:
+    /// - All values scaled by RATIO_SCALE (1e18) to simulate decimals
+    /// - Division after each multiplication prevents intermediate overflow
+    /// - base=1.1e18 means 10% price increase per token
+    ///
     /// @param base The base value (scaled by RATIO_SCALE, e.g., 1.1e18 for 10% increase)
     /// @param exp The exponent (supply level)
     /// @return result The result scaled by RATIO_SCALE
     function _pow(uint256 base, uint256 exp) internal pure returns (uint256 result) {
-        result = RATIO_SCALE; // Start with 1.0 in fixed-point
+        result = RATIO_SCALE; // Start with 1.0 in fixed-point (1e18 / 1e18 = 1)
         
-        // Prevent overflow for extremely high supplies
-        // At ratio=1.1, supply=1000 would overflow uint256
-        // Cap at reasonable supply where price would exceed practical limits
-        if (exp > 500) {
-            // For very high supplies, return max practical price
-            // This is a safety bound - real pools should have maxSupply << 500
+        // OVERFLOW PROTECTION:
+        // At ratio=1.1 (10% increase), supply=500 yields price multiplier of ~5e21
+        // Beyond this, uint256 overflow becomes likely during intermediate calculations
+        // Real pools should set maxSupply well below this theoretical limit
+        if (exp > MAX_EXPONENTIAL_SUPPLY) {
             return type(uint256).max / RATIO_SCALE;
         }
         
+        // Binary exponentiation loop - processes one bit of exponent per iteration
         while (exp > 0) {
+            // If current bit is 1, multiply result by current base
             if (exp % 2 == 1) {
                 result = (result * base) / RATIO_SCALE;
             }
+            // Square the base for next bit position
             base = (base * base) / RATIO_SCALE;
+            // Shift to next bit
             exp /= 2;
         }
     }
@@ -378,7 +411,7 @@ contract BondingCurve is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
             } else {
                 if (supply > i) {
                     total +=
-                        ((_calculatePrice(pool, supply - i - 1)) * 95) /
+                        ((_calculatePrice(pool, supply - i - 1)) * SELL_SPREAD_PERCENT) /
                         100;
                 }
             }
@@ -400,7 +433,47 @@ contract BondingCurve is Ownable, ReentrancyGuard, Pausable, ERC721Holder {
         return poolTokenIds[poolId].length;
     }
 
-    // Admin functions
+    // ============ Withdrawal Functions ============
+    
+    /// @notice Withdraw accumulated creator payments (pull-pattern)
+    /// @dev Creators call this to receive their sales proceeds safely
+    function withdrawCreatorPayments() external nonReentrant {
+        uint256 amount = pendingCreatorPayments[msg.sender];
+        if (amount == 0) revert NothingToWithdraw();
+        
+        pendingCreatorPayments[msg.sender] = 0;
+        
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        if (!success) revert TransferFailed();
+        
+        emit CreatorPaymentWithdrawn(msg.sender, amount);
+    }
+    
+    /// @notice Emergency function to recover NFTs stuck in abandoned pools
+    /// @dev Only callable by owner after pool creator abandons (e.g., lost keys)
+    ///      Requires pool to have no reserve (no user funds at risk)
+    /// @param poolId The pool containing the stuck NFT
+    /// @param tokenId The specific token ID to recover
+    /// @param recipient Address to send the recovered NFT to
+    function emergencyWithdrawNFT(
+        uint256 poolId,
+        uint256 tokenId,
+        address recipient
+    ) external onlyOwner nonReentrant {
+        Pool storage pool = pools[poolId];
+        if (pool.nftContract == address(0)) revert InvalidPool();
+        // Safety: only allow recovery if no user funds (reserve) are at risk
+        if (pool.reserveBalance > 0) revert InvalidParams();
+        if (recipient == address(0)) revert ZeroAddress();
+        
+        _removeTokenFromPool(poolId, tokenId);
+        IERC721(pool.nftContract).safeTransferFrom(address(this), recipient, tokenId);
+        
+        emit EmergencyTokenWithdrawn(poolId, pool.nftContract, tokenId);
+    }
+
+    // ============ Admin Functions ============
+    
     function setPlatformFee(uint256 newFee) external onlyOwner {
         if (newFee > 1000) revert FeeTooHigh();
         platformFee = newFee;
