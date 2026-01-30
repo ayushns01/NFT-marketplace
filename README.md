@@ -65,8 +65,6 @@ contracts/
 - ✅ **Invariant tests** - Foundry property-based tests for financial logic
 - ✅ **Static analysis** - Slither integration in CI (GitHub Actions)
 
-> ⚠️ **WARNING**: This project has NOT been professionally audited. See [SECURITY.md](SECURITY.md) for details.
-
 ## Installation
 
 ```bash
