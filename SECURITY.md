@@ -159,6 +159,93 @@ uint256 gasLimit = gasleft() > 550000 ? 500000 : gasleft() - 50000;
 
 **Impact:** Medium - Enables coordinated emergency response.
 
+## Additional Fixes (January 2026 - Code Review)
+
+#### 13. ✅ FractionalVault Inconsistent Transfer Method
+**Issue:** `redeem()` used `transferFrom` while `buyout()` used `safeTransferFrom` - inconsistent and potentially unsafe.
+
+**Fix:** Changed `redeem()` to use `safeTransferFrom`:
+```solidity
+// Use safeTransferFrom for recipient safety - ensures receiver can handle ERC721
+IERC721(vault.nftContract).safeTransferFrom(address(this), msg.sender, vault.tokenId);
+```
+
+**Impact:** Low - Ensures consistency and prevents NFTs being sent to contracts that can't handle them.
+
+#### 14. ✅ Marketplace updatePrice Missing nonReentrant
+**Issue:** `updatePrice()` lacked `nonReentrant` modifier while other state-changing functions had it.
+
+**Fix:** Added `nonReentrant` modifier for consistency.
+
+**Impact:** Low - Defensive measure for consistent protection pattern.
+
+#### 15. ✅ BondingCurve Creator Payment DoS Vector
+**Issue:** Direct ETH transfer to `pool.creator` in `buy()` would fail if creator is malicious contract that reverts.
+
+**Fix:** Implemented pull-pattern with `pendingCreatorPayments` mapping:
+```solidity
+if (forCreator > 0) {
+    pendingCreatorPayments[pool.creator] += forCreator;
+    emit CreatorPaymentAccrued(poolId, pool.creator, forCreator);
+}
+```
+
+**Impact:** High - Prevents DoS attack where malicious creator blocks all pool sales.
+
+#### 16. ✅ VickreyAuction Settlement DoS Vector
+**Issue:** Direct ETH transfers to `feeRecipient` and `auction.seller` in `settle()` could brick auction settlement.
+
+**Fix:** Changed to pull-pattern:
+```solidity
+pendingWithdrawals[feeRecipient] += fee;
+pendingWithdrawals[auction.seller] += sellerProceeds;
+```
+
+**Impact:** High - Ensures auctions can always settle regardless of recipient behavior.
+
+#### 17. ✅ BondingCurve Missing maxSupply Validation
+**Issue:** `createPool()` didn't validate `maxSupply > 0`, allowing unbounded/purposeless pools.
+
+**Fix:** Added validation:
+```solidity
+if (maxSupply == 0) revert InvalidMaxSupply();
+```
+
+**Impact:** Low - Prevents accidental creation of invalid pools.
+
+#### 18. ✅ BondingCurve Emergency NFT Recovery
+**Issue:** No mechanism to recover stuck NFTs from abandoned pools (e.g., creator lost keys).
+
+**Fix:** Added `emergencyWithdrawNFT()` function (owner-only, requires zero reserve balance):
+```solidity
+function emergencyWithdrawNFT(uint256 poolId, uint256 tokenId, address recipient) external onlyOwner nonReentrant
+```
+
+**Impact:** Medium - Enables recovery without risking user funds.
+
+#### 19. ✅ Magic Numbers Replaced with Named Constants
+**Issue:** Magic numbers like `95`, `100`, `500`, `2500` scattered throughout code.
+
+**Fix:** Added named constants with documentation:
+```solidity
+uint256 public constant SELL_SPREAD_PERCENT = 95; // Sellers receive 95% of buy price (5% spread)
+uint256 public constant MAX_BATCH_SIZE = 100; // Prevent gas exhaustion in batch operations
+uint256 public constant MAX_EXPONENTIAL_SUPPLY = 500; // Overflow protection for exponential curves
+uint256 public constant MAX_ROYALTY_BPS = 2500; // 25% maximum royalty to prevent abuse
+```
+
+**Impact:** Low - Improves readability and maintainability.
+
+#### 20. ✅ Binary Exponentiation Documentation
+**Issue:** `_pow()` function lacked explanation of WHY the algorithm was chosen.
+
+**Fix:** Added comprehensive NatSpec explaining:
+- Why O(log n) vs O(n) matters
+- How fixed-point math prevents overflow
+- Why the supply cap exists
+
+**Impact:** Low - Enables future maintainers to understand and safely modify.
+
 ## Remaining Known Issues
 
 ### Medium Priority
