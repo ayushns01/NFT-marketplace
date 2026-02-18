@@ -35,7 +35,7 @@ contract BondingCurveInvariantTest is Test {
         
         // Create linear bonding curve pool
         vm.startPrank(creator);
-        uint256 poolId = curve.createPool(
+        curve.createPool(
             address(nft),
             BondingCurve.CurveType.Linear,
             BASE_PRICE,
@@ -46,9 +46,15 @@ contract BondingCurveInvariantTest is Test {
         );
         
         // Mint and approve NFTs for the pool
+        uint256[] memory tokenIds = new uint256[](100);
         for (uint256 i = 0; i < 100; i++) {
-            nft.mint(address(curve), string(abi.encodePacked("ipfs://", vm.toString(i))));
+            nft.mint(creator, string(abi.encodePacked("ipfs://", vm.toString(i))));
+            tokenIds[i] = i;
         }
+        
+        // Approve and deposit tokens into the pool
+        nft.setApprovalForAll(address(curve), true);
+        curve.depositTokens(0, tokenIds);
         vm.stopPrank();
     }
 
@@ -97,17 +103,17 @@ contract BondingCurveInvariantTest is Test {
         uint256 initialReserve = pool.reserveBalance;
         
         // Buy a token
-        uint256 price = curve.getBuyPrice(0);
-        vm.deal(buyer1, price);
+        uint256 buyPrice = curve.getBuyPrice(0);
+        vm.deal(buyer1, buyPrice);
         vm.prank(buyer1);
-        curve.buy{value: price}(0, 0, price);
+        curve.buy{value: buyPrice}(0, buyPrice);
         
         pool = curve.getPool(0);
         
         // Calculate expected reserve increase
-        uint256 fee = (price * PLATFORM_FEE) / 10000;
-        uint256 royalty = (price * 500) / 10000;
-        uint256 expectedReserveIncrease = price - fee - royalty;
+        uint256 fee = (buyPrice * PLATFORM_FEE) / 10000;
+        uint256 royalty = (buyPrice * 500) / 10000;
+        uint256 expectedReserveIncrease = buyPrice - fee - royalty;
         
         assertEq(
             pool.reserveBalance,
@@ -122,7 +128,7 @@ contract BondingCurveInvariantTest is Test {
         uint256 buyPrice = curve.getBuyPrice(0);
         vm.deal(buyer1, buyPrice);
         vm.prank(buyer1);
-        curve.buy{value: buyPrice}(0, 0, buyPrice);
+        curve.buy{value: buyPrice}(0, buyPrice);
         
         // Get sell price
         uint256 sellPrice = curve.getSellPrice(0);
@@ -148,10 +154,10 @@ contract BondingCurveInvariantTest is Test {
         
         // Buy 5 tokens
         for (uint256 i = 0; i < 5; i++) {
-            uint256 price = curve.getBuyPrice(0);
-            vm.deal(buyer1, price);
+            uint256 buyPrice = curve.getBuyPrice(0);
+            vm.deal(buyer1, buyPrice);
             vm.prank(buyer1);
-            curve.buy{value: price}(0, i, price);
+            curve.buy{value: buyPrice}(0, buyPrice);
         }
         
         pool = curve.getPool(0);
@@ -167,10 +173,10 @@ contract BondingCurveInvariantTest is Test {
         
         // Buy all minted tokens
         for (uint256 i = 0; i < mintedCount; i++) {
-            uint256 price = curve.getBuyPrice(0);
-            vm.deal(buyer1, price);
+            uint256 loopBuyPrice = curve.getBuyPrice(0);
+            vm.deal(buyer1, loopBuyPrice);
             vm.prank(buyer1);
-            curve.buy{value: price}(0, i, price);
+            curve.buy{value: loopBuyPrice}(0, loopBuyPrice);
         }
         
         pool = curve.getPool(0);
@@ -178,12 +184,12 @@ contract BondingCurveInvariantTest is Test {
         
         // Next buy should fail because no more NFTs are held by curve
         // Note: In production, this would be MaxSupplyReached if supply == maxSupply
-        // Here it fails because curve doesn't own tokenId 100
-        uint256 price = curve.getBuyPrice(0);
-        vm.deal(buyer2, price);
+        // Here it fails because curve doesn't have more tokens available
+        uint256 buyPrice = curve.getBuyPrice(0);
+        vm.deal(buyer2, buyPrice);
         vm.prank(buyer2);
-        vm.expectRevert(); // NotTokenOwner because NFT 100 doesn't exist in curve
-        curve.buy{value: price}(0, mintedCount, price);
+        vm.expectRevert(BondingCurve.NoTokensAvailable.selector);
+        curve.buy{value: buyPrice}(0, buyPrice);
     }
 
     /// @notice Helper to calculate linear price
